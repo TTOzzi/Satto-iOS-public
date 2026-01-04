@@ -13,6 +13,7 @@ import PackageDescription
       "SwiftRichString": .staticFramework,
       "Kingfisher": .staticFramework,
       "Lottie": .staticFramework,
+      "spm-nmapsmap": .staticFramework
     ]
   )
 #endif
@@ -27,5 +28,6 @@ let package = Package(
     .package(url: "https://github.com/malcommac/SwiftRichString.git", from: "3.7.2"),
     .package(url: "https://github.com/onevcat/Kingfisher.git", from: "8.5.0"),
     .package(url: "https://github.com/airbnb/lottie-ios.git", from: "4.5.2"),
+    .package(url: "https://github.com/navermaps/SPM-NMapsMap", from: "3.23.0"),
   ]
 )

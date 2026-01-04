@@ -16,6 +16,7 @@ struct FeatureLayer: Layer {
           .target(name: "Setting"),
           .target(name: "History"),
           .target(name: "Fortune"),
+          .target(name: "Map"),
         ],
         settings: .settings(
           base: [
@@ -52,6 +53,13 @@ struct FeatureLayer: Layer {
         name: "Fortune",
         dependencies: [
           .project(target: "CommonLayer", path: "../Common")
+        ]
+      ),
+      .createTarget(
+        name: "Map",
+        dependencies: [
+          .project(target: "CommonLayer", path: "../Common"),
+          .external(name: "NMapsMap")
         ]
       ),
     ]
