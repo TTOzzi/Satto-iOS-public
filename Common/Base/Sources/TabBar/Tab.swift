@@ -12,6 +12,7 @@ enum Tab: CaseIterable {
   case home
   //  case fortune
   case pastLotto
+  case map
   case my
 
   var title: String {
@@ -22,6 +23,8 @@ enum Tab: CaseIterable {
     //      return "오늘 운세"
     case .pastLotto:
       return "뭐 나왔지"
+    case .map:
+      return "명소"
     case .my:
       return "마이"
     }
@@ -35,6 +38,8 @@ enum Tab: CaseIterable {
     //      return STImages.clover.image
     case .pastLotto:
       return STImages.receipt.image
+    case .map:
+      return STImages.mapPin.image
     case .my:
       return STImages.user.image
     }

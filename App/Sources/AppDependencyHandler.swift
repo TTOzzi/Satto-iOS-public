@@ -11,6 +11,7 @@ import Foundation
 import History
 import Home
 import Lib
+import Map
 import Onboarding
 import Setting
 import UIKit
@@ -40,6 +41,8 @@ struct AppDependencyHandler: DependencyRegistrable {
       //        rootViewController: FortuneViewController(viewModel: FortuneViewModel())),
       BaseNavigationController(
         rootViewController: HistoryWebViewController(viewModel: HistoryWebViewModel())),
+      BaseNavigationController(
+        rootViewController: MapViewController(viewModel: MapViewModel())),
       BaseNavigationController(
         rootViewController: MyPageViewController(viewModel: MyPageViewModel())),
     ]
