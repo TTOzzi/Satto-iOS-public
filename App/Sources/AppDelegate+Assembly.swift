@@ -14,6 +14,7 @@ import Lib
 import NetworkCore
 import Onboarding
 import Setting
+import Map
 
 extension AppDelegate {
   func setupDependencyInjector() {
@@ -25,6 +26,7 @@ extension AppDelegate {
       FortuneAssembly(),
       OnboardingAssembly(),
       HomeAssembly(),
+      MapAssembly()
     ])
   }
 }

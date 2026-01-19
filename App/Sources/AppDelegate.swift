@@ -4,6 +4,7 @@ import Lib
 import Onboarding
 import Setting
 import UIKit
+import NMapsMap
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,6 +15,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) -> Bool {
     setupDependencyInjector()
     setupDependencyHandler()
+    NMFAuthManager.shared().ncpKeyId = "JGdDcvg1tM7TijB06izBlkDXc0CkuabcE4NMcHD8"
     return true
   }
 

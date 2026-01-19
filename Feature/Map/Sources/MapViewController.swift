@@ -16,7 +16,7 @@ import UIKit
 public final class MapViewController: BaseViewController {
 
   private enum Constant {
-    static let defaultLatitude: Double = 37.5665 // 서울 기본 좌표
+    static let defaultLatitude: Double = 37.5665
     static let defaultLongitude: Double = 126.9780
     static let defaultZoom: Double = 15.0
   }
@@ -33,7 +33,6 @@ public final class MapViewController: BaseViewController {
   }
   
   private var markers: [NMFMarker] = []
-
   private let viewModel: MapViewModel
 
   public init(viewModel: MapViewModel) {
@@ -51,6 +50,11 @@ public final class MapViewController: BaseViewController {
     setupBinding()
     viewModel.send(input: .viewDidLoad)
   }
+  
+  public override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    viewModel.send(input: .viewDidAppear)
+  }
 
   private func setupUI() {
     title = "명소"
@@ -61,7 +65,6 @@ public final class MapViewController: BaseViewController {
       $0.edges.equalTo(view.safeAreaLayoutGuide)
     }
     
-    // 초기 카메라 위치 설정
     let cameraPosition = NMFCameraPosition(
       NMGLatLng(lat: Constant.defaultLatitude, lng: Constant.defaultLongitude),
       zoom: Constant.defaultZoom
@@ -95,14 +98,75 @@ public final class MapViewController: BaseViewController {
         self.showErrorPopup(action: retryAction)
       }
       .store(in: &cancellables)
+    
+    viewModel.output.locationAuthorizationStatus
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] status in
+        self?.handleAuthorizationStatus(status)
+      }
+      .store(in: &cancellables)
+    
+    viewModel.output.currentLocation
+      .compactMap { $0 }
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] location in
+        self?.handleLocationUpdate(location)
+      }
+      .store(in: &cancellables)
+    
+    viewModel.output.shouldShowLocationDeniedAlert
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] in
+        self?.showLocationPermissionDeniedAlert()
+      }
+      .store(in: &cancellables)
+  }
+  
+  private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
+    switch status {
+    case .authorizedWhenInUse, .authorizedAlways:
+      // 권한 승인 - 위치 모드 활성화
+      mapView.positionMode = .direction
+    default:
+      break
+    }
+  }
+  
+  private func handleLocationUpdate(_ location: CLLocation) {
+    let cameraPosition = NMFCameraPosition(
+      NMGLatLng(lat: location.coordinate.latitude, lng: location.coordinate.longitude),
+      zoom: Constant.defaultZoom
+    )
+    let cameraUpdate = NMFCameraUpdate(position: cameraPosition)
+    cameraUpdate.animation = .easeIn
+    mapView.moveCamera(cameraUpdate)
+  }
+  
+  private func showLocationPermissionDeniedAlert() {
+    let alert = UIAlertController(
+      title: "위치 서비스 사용 권한 확인",
+      message: "서비스 이용을 위해 위치 서비스 사용 설정이 필요합니다.\n기기 또는 시뮬레이터에서 위치 사용 권한을 켜주세요.",
+      preferredStyle: .alert
+    )
+    
+    let settingsAction = UIAlertAction(title: "설정", style: .default) { _ in
+      if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+        UIApplication.shared.open(settingsURL)
+      }
+    }
+    
+    let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+    
+    alert.addAction(cancelAction)
+    alert.addAction(settingsAction)
+    
+    present(alert, animated: true)
   }
 
   private func updateMapAnnotations() {
-    // 기존 마커 제거
     markers.forEach { $0.mapView = nil }
     markers.removeAll()
     
-    // 새로운 마커 추가
     let places = viewModel.output.places.value
     
     for place in places {
@@ -112,11 +176,9 @@ public final class MapViewController: BaseViewController {
       marker.iconTintColor = STColors.primary1.color
       marker.mapView = mapView
       
-      // 마커 탭 이벤트
       marker.touchHandler = { [weak self] (overlay) -> Bool in
         self?.viewModel.send(input: .placeTapped(place: place))
         
-        // 마커 선택 시 해당 위치로 카메라 이동
         let cameraPosition = NMFCameraPosition(
           NMGLatLng(lat: place.latitude, lng: place.longitude),
           zoom: 17.0
@@ -131,7 +193,6 @@ public final class MapViewController: BaseViewController {
       markers.append(marker)
     }
     
-    // 첫 번째 장소로 카메라 이동
     if let firstPlace = places.first {
       let cameraPosition = NMFCameraPosition(
         NMGLatLng(lat: firstPlace.latitude, lng: firstPlace.longitude),
@@ -148,3 +209,4 @@ public final class MapViewController: BaseViewController {
 #Preview {
   MapViewController(viewModel: MapViewModel())
 }
+

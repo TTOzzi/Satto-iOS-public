@@ -6,38 +6,44 @@
 //
 
 import Combine
+import CoreLocation
+import DIInjector
 import Foundation
 
 public final class MapViewModel {
 
-  // MARK: - Input
-  public enum Input {
+  enum Input {
     case viewDidLoad
+    case viewDidAppear
     case placeTapped(place: Place)
     case refresh
   }
 
-  // MARK: - Output
-  public struct Output {
+  struct Output {
     let places = CurrentValueSubject<[Place], Never>([])
     let isLoading = PassthroughSubject<Bool, Never>()
     let showError = PassthroughSubject<() -> Void, Never>()
+    let locationAuthorizationStatus = PassthroughSubject<CLAuthorizationStatus, Never>()
+    let currentLocation = PassthroughSubject<CLLocation?, Never>()
+    let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
   }
 
-  public let output = Output()
+  @Injected var locationService: LocationService
+  
+  let output = Output()
   private var cancellables = Set<AnyCancellable>()
 
-  // Dependencies
-  // private let mapRepository: MapRepositoryProtocol
-
   public init() {
-    // self.mapRepository = DIContainer.shared.resolve(MapRepositoryProtocol.self)
+    setupLocationBinding()
   }
 
-  public func send(input: Input) {
+  func send(input: Input) {
     switch input {
     case .viewDidLoad:
       handleViewDidLoad()
+      
+    case .viewDidAppear:
+      handleViewDidAppear()
 
     case .placeTapped(let place):
       handlePlaceTapped(place: place)
@@ -45,6 +51,48 @@ public final class MapViewModel {
     case .refresh:
       handleRefresh()
     }
+  }
+  
+  private func setupLocationBinding() {
+    locationService.authorizationStatus
+      .sink { [weak self] status in
+        self?.output.locationAuthorizationStatus.send(status)
+        self?.handleAuthorizationStatus(status)
+      }
+      .store(in: &cancellables)
+    
+    locationService.currentLocation
+      .sink { [weak self] location in
+        self?.output.currentLocation.send(location)
+
+        if location != nil {
+          self?.locationService.stopUpdatingLocation()
+        }
+      }
+      .store(in: &cancellables)
+    
+    locationService.locationError
+      .sink { error in
+        // TODO: 에러
+      }
+      .store(in: &cancellables)
+  }
+  
+  private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
+    switch status {
+    case .restricted, .denied:
+      output.shouldShowLocationDeniedAlert.send(())
+    case .authorizedWhenInUse, .authorizedAlways:
+      break
+    case .notDetermined:
+      break
+    @unknown default:
+      break
+    }
+  }
+  
+  private func handleViewDidAppear() {
+    locationService.requestAuthorization()
   }
 
   private func handleViewDidLoad() {
