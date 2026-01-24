@@ -15,7 +15,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) -> Bool {
     setupDependencyInjector()
     setupDependencyHandler()
-    NMFAuthManager.shared().ncpKeyId = "JGdDcvg1tM7TijB06izBlkDXc0CkuabcE4NMcHD8"
+    NMFAuthManager.shared().ncpKeyId = "o6fmsibs9l" // 재발급하기
     return true
   }
 
