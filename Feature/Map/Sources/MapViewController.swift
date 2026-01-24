@@ -22,17 +22,28 @@ public final class MapViewController: BaseViewController {
   }
 
   private lazy var naverMapView = NMFNaverMapView().then {
-    $0.showLocationButton = true
-    $0.showZoomControls = true
-    $0.showCompass = true
-    $0.showScaleBar = true
+    $0.showLocationButton = false
+    $0.showZoomControls = false
+    $0.showCompass = false
+    $0.showScaleBar = false
   }
-  
   private var mapView: NMFMapView {
     return naverMapView.mapView
   }
-  
   private var markers: [NMFMarker] = []
+  private lazy var myLocationButton = UIButton(type: .system).then {
+    $0.backgroundColor = .white
+    $0.layer.cornerRadius = 24
+    $0.layer.shadowColor = UIColor.black.cgColor
+    $0.layer.shadowOpacity = 0.1
+    $0.layer.shadowRadius = 6
+    $0.layer.shadowOffset = CGSize(width: 0, height: 2)
+    $0.tintColor = STColors.gray5.color
+    $0.setImage(UIImage(systemName: "crosshair"), for: .normal)
+    $0.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+    $0.addTarget(self, action: #selector(didTapMyLocation), for: .touchUpInside)
+    $0.accessibilityLabel = "현재 위치로 이동"
+  }
   private let viewModel: MapViewModel
 
   public init(viewModel: MapViewModel) {
@@ -47,6 +58,7 @@ public final class MapViewController: BaseViewController {
   public override func viewDidLoad() {
     super.viewDidLoad()
     setupUI()
+    updateMyLocationButtonAppearance(for: mapView.positionMode)
     setupBinding()
     viewModel.send(input: .viewDidLoad)
   }
@@ -63,6 +75,13 @@ public final class MapViewController: BaseViewController {
     view.addSubview(naverMapView)
     naverMapView.snp.makeConstraints {
       $0.edges.equalTo(view.safeAreaLayoutGuide)
+    }
+    
+    view.addSubview(myLocationButton)
+    myLocationButton.snp.makeConstraints {
+      $0.width.height.equalTo(48)
+      $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
+      $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
     }
     
     let cameraPosition = NMFCameraPosition(
@@ -127,6 +146,7 @@ public final class MapViewController: BaseViewController {
     case .authorizedWhenInUse, .authorizedAlways:
       // 권한 승인 - 위치 모드 활성화
       mapView.positionMode = .direction
+      updateMyLocationButtonAppearance(for: mapView.positionMode)
     default:
       break
     }
@@ -161,6 +181,44 @@ public final class MapViewController: BaseViewController {
     alert.addAction(settingsAction)
     
     present(alert, animated: true)
+  }
+
+  private func nextPositionMode(from current: NMFMyPositionMode) -> NMFMyPositionMode {
+    switch current {
+    case .normal:
+      return .direction
+    case .direction:
+      return .compass
+    case .compass:
+      return .disabled
+    case .disabled:
+      return .normal
+    @unknown default:
+      return .normal
+    }
+  }
+  
+  private func updateMyLocationButtonAppearance(for mode: NMFMyPositionMode) {
+    switch mode {
+    case .disabled:
+      myLocationButton.setImage(STImages.crosshair.image, for: .normal)
+      myLocationButton.tintColor = STColors.gray5.color
+    case .normal:
+      myLocationButton.setImage(STImages.crosshair.image, for: .normal)
+      myLocationButton.tintColor = STColors.primary2.color
+    case .direction, .compass:
+      myLocationButton.setImage(STImages.crosshair2.image, for: .normal)
+      myLocationButton.tintColor = STColors.primary2.color
+    @unknown default:
+      myLocationButton.setImage(STImages.crosshair.image, for: .normal)
+      myLocationButton.tintColor = STColors.primary2.color
+    }
+  }
+  
+  @objc private func didTapMyLocation() {
+    let newMode = nextPositionMode(from: mapView.positionMode)
+    mapView.positionMode = newMode
+    updateMyLocationButtonAppearance(for: newMode)
   }
 
   private func updateMapAnnotations() {
