@@ -32,6 +32,7 @@ public final class MapViewController: BaseViewController {
   }
   private var lottoMarkers: [String: LottoMarker] = [:]
   private var selectedStoreId: String?
+  private var nextCameraMoveReason: CameraMoveReason = .initial
   private lazy var searchButton = UIButton(type: .system).then {
     $0.setTitle("현 지도에서 검색", for: .normal)
     $0.setTitleColor(STColors.primary1.color, for: .normal)
@@ -82,7 +83,6 @@ public final class MapViewController: BaseViewController {
   public override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     viewModel.send(input: .viewDidAppear)
-    notifyMapBoundsChanged()
   }
 
   private func setupUI() {
@@ -190,6 +190,7 @@ public final class MapViewController: BaseViewController {
   }
 
   private func handleLocationUpdate(_ location: CLLocation) {
+    nextCameraMoveReason = .moveToCurrentLocation
     let cameraPosition = NMFCameraPosition(
       NMGLatLng(lat: location.coordinate.latitude, lng: location.coordinate.longitude),
       zoom: Constant.defaultZoom
@@ -262,15 +263,14 @@ public final class MapViewController: BaseViewController {
     viewModel.send(input: .searchButtonTapped)
   }
 
-  private func notifyMapBoundsChanged() {
+  private func currentMapBounds() -> MapBounds {
     let bounds = mapView.contentBounds
-    let mapBounds = MapBounds(
+    return MapBounds(
       minLat: bounds.southWestLat,
       maxLat: bounds.northEastLat,
       minLng: bounds.southWestLng,
       maxLng: bounds.northEastLng
     )
-    viewModel.send(input: .mapBoundsChanged(bounds: mapBounds))
   }
 
   private func updateSearchButtonVisibility(shouldShow: Bool) {
@@ -342,7 +342,9 @@ public final class MapViewController: BaseViewController {
 // MARK: - NMFMapViewCameraDelegate
 extension MapViewController: NMFMapViewCameraDelegate {
   public func mapViewCameraIdle(_ mapView: NMFMapView) {
-    notifyMapBoundsChanged()
+    let reason = nextCameraMoveReason
+    nextCameraMoveReason = .userInteraction
+    viewModel.send(input: .cameraIdle(bounds: currentMapBounds(), reason: reason))
   }
 }
 

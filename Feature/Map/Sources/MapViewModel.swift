@@ -24,12 +24,18 @@ public struct MapBounds {
   }
 }
 
+public enum CameraMoveReason {
+  case initial
+  case userInteraction
+  case moveToCurrentLocation
+}
+
 public final class MapViewModel {
 
   enum Input {
     case viewDidLoad
     case viewDidAppear
-    case mapBoundsChanged(bounds: MapBounds)
+    case cameraIdle(bounds: MapBounds, reason: CameraMoveReason)
     case searchButtonTapped
     case storeTapped(store: LottoStore)
   }
@@ -42,7 +48,7 @@ public final class MapViewModel {
     let currentLocation = PassthroughSubject<CLLocation?, Never>()
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
     let selectedStore = PassthroughSubject<LottoStore?, Never>()
-    let shouldShowSearchButton = PassthroughSubject<Bool, Never>()
+    let shouldShowSearchButton = CurrentValueSubject<Bool, Never>(false)
   }
 
   @Injected var locationService: LocationService
@@ -65,8 +71,8 @@ public final class MapViewModel {
     case .viewDidAppear:
       handleViewDidAppear()
 
-    case .mapBoundsChanged(let bounds):
-      handleMapBoundsChanged(bounds: bounds)
+    case .cameraIdle(let bounds, let reason):
+      handleCameraIdle(bounds: bounds, reason: reason)
 
     case .searchButtonTapped:
       handleSearchButtonTapped()
@@ -118,16 +124,26 @@ public final class MapViewModel {
     locationService.requestAuthorization()
   }
 
-  private func handleMapBoundsChanged(bounds: MapBounds) {
+  private func handleCameraIdle(bounds: MapBounds, reason: CameraMoveReason) {
     currentBounds = bounds
 
-    if !hasInitiallyLoaded {
+    switch reason {
+    case .initial:
       // 최초 진입 시 자동 조회
-      fetchLottoStores(bounds: bounds)
-      hasInitiallyLoaded = true
-    } else {
-      // 이후 지도 이동 시 버튼 표시
-      output.shouldShowSearchButton.send(true)
+      if !hasInitiallyLoaded {
+        fetchLottoStores(bounds: bounds)
+        hasInitiallyLoaded = true
+      }
+
+    case .userInteraction:
+      // 사용자 지도 이동 시 버튼 표시
+      if hasInitiallyLoaded {
+        output.shouldShowSearchButton.send(true)
+      }
+
+    case .moveToCurrentLocation:
+      // 현재 위치로 이동 시 무시
+      break
     }
   }
 
