@@ -13,6 +13,10 @@ public final class MapAssembly: Assembly {
     container.register(LocationService.self) { _ in
       return LocationService.shared
     }
+
+    container.register(MapService.self) { _ in
+      return MapService()
+    }
   }
 
   public init() {}

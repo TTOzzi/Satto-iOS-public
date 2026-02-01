@@ -10,28 +10,45 @@ import CoreLocation
 import DIInjector
 import Foundation
 
+public struct MapBounds {
+  let minLat: Double
+  let maxLat: Double
+  let minLng: Double
+  let maxLng: Double
+
+  public init(minLat: Double, maxLat: Double, minLng: Double, maxLng: Double) {
+    self.minLat = minLat
+    self.maxLat = maxLat
+    self.minLng = minLng
+    self.maxLng = maxLng
+  }
+}
+
 public final class MapViewModel {
 
   enum Input {
     case viewDidLoad
     case viewDidAppear
-    case placeTapped(place: Place)
-    case refresh
+    case mapBoundsChanged(bounds: MapBounds)
+    case storeTapped(store: LottoStore)
   }
 
   struct Output {
-    let places = CurrentValueSubject<[Place], Never>([])
+    let lottoStores = CurrentValueSubject<[LottoStore], Never>([])
     let isLoading = PassthroughSubject<Bool, Never>()
     let showError = PassthroughSubject<() -> Void, Never>()
     let locationAuthorizationStatus = PassthroughSubject<CLAuthorizationStatus, Never>()
     let currentLocation = PassthroughSubject<CLLocation?, Never>()
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
+    let selectedStore = PassthroughSubject<LottoStore?, Never>()
   }
 
   @Injected var locationService: LocationService
-  
+  @Injected var mapService: MapService
+
   let output = Output()
   private var cancellables = Set<AnyCancellable>()
+  private var currentBounds: MapBounds?
 
   public init() {
     setupLocationBinding()
@@ -40,19 +57,19 @@ public final class MapViewModel {
   func send(input: Input) {
     switch input {
     case .viewDidLoad:
-      handleViewDidLoad()
-      
+      break
+
     case .viewDidAppear:
       handleViewDidAppear()
 
-    case .placeTapped(let place):
-      handlePlaceTapped(place: place)
+    case .mapBoundsChanged(let bounds):
+      handleMapBoundsChanged(bounds: bounds)
 
-    case .refresh:
-      handleRefresh()
+    case .storeTapped(let store):
+      handleStoreTapped(store: store)
     }
   }
-  
+
   private func setupLocationBinding() {
     locationService.authorizationStatus
       .sink { [weak self] status in
@@ -60,7 +77,7 @@ public final class MapViewModel {
         self?.handleAuthorizationStatus(status)
       }
       .store(in: &cancellables)
-    
+
     locationService.currentLocation
       .sink { [weak self] location in
         self?.output.currentLocation.send(location)
@@ -70,14 +87,14 @@ public final class MapViewModel {
         }
       }
       .store(in: &cancellables)
-    
+
     locationService.locationError
       .sink { error in
         // TODO: 에러
       }
       .store(in: &cancellables)
   }
-  
+
   private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
     switch status {
     case .restricted, .denied:
@@ -90,62 +107,39 @@ public final class MapViewModel {
       break
     }
   }
-  
+
   private func handleViewDidAppear() {
     locationService.requestAuthorization()
   }
 
-  private func handleViewDidLoad() {
+  private func handleMapBoundsChanged(bounds: MapBounds) {
+    currentBounds = bounds
+    fetchLottoStores(bounds: bounds)
+  }
+
+  private func handleStoreTapped(store: LottoStore) {
+    output.selectedStore.send(store)
+  }
+
+  private func fetchLottoStores(bounds: MapBounds) {
     output.isLoading.send(true)
-    
-    // TODO: 실제 데이터 로딩 로직 구현
-    // mapRepository.fetchPlaces()
-    //   .sink(
-    //     receiveCompletion: { [weak self] completion in
-    //       self?.output.isLoading.send(false)
-    //       if case .failure = completion {
-    //         self?.output.showError.send({ [weak self] in
-    //           self?.handleViewDidLoad()
-    //         })
-    //       }
-    //     },
-    //     receiveValue: { [weak self] places in
-    //       self?.output.places.send(places)
-    //     }
-    //   )
-    //   .store(in: &cancellables)
-
-    // 임시 데이터
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-      self?.output.isLoading.send(false)
-      self?.output.places.send([
-        Place(id: "1", name: "명소 1", latitude: 37.5665, longitude: 126.9780),
-        Place(id: "2", name: "명소 2", latitude: 37.5651, longitude: 126.9770),
-      ])
+    Task {
+      do {
+        let stores = try await mapService.fetchLottoStores(
+          minLat: bounds.minLat,
+          maxLat: bounds.maxLat,
+          minLng: bounds.minLng,
+          maxLng: bounds.maxLng
+        )
+        output.lottoStores.send(stores)
+        output.isLoading.send(false)
+      } catch {
+        output.isLoading.send(false)
+        output.showError.send { [weak self] in
+          guard let self, let bounds = self.currentBounds else { return }
+          self.fetchLottoStores(bounds: bounds)
+        }
+      }
     }
-  }
-
-  private func handlePlaceTapped(place: Place) {
-    // 명소 선택 시 처리 로직
-    print("Place tapped: \(place.name)")
-  }
-
-  private func handleRefresh() {
-    handleViewDidLoad()
-  }
-}
-
-// MARK: - Models
-public struct Place {
-  let id: String
-  let name: String
-  let latitude: Double
-  let longitude: Double
-  
-  public init(id: String, name: String, latitude: Double, longitude: Double) {
-    self.id = id
-    self.name = name
-    self.latitude = latitude
-    self.longitude = longitude
   }
 }

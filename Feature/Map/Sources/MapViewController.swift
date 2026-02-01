@@ -30,9 +30,8 @@ public final class MapViewController: BaseViewController {
   private var mapView: NMFMapView {
     return naverMapView.mapView
   }
-  private var markers: [NMFMarker] = []
-  private var lottoMarker: LottoMarker?
-  private var atmMarker: ATMMarker?
+  private var lottoMarkers: [String: LottoMarker] = [:]
+  private var selectedStoreId: String?
   private lazy var myLocationButton = UIButton(type: .system).then {
     $0.backgroundColor = .white
     $0.layer.cornerRadius = 24
@@ -64,10 +63,11 @@ public final class MapViewController: BaseViewController {
     setupBinding()
     viewModel.send(input: .viewDidLoad)
   }
-  
+
   public override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     viewModel.send(input: .viewDidAppear)
+    notifyMapBoundsChanged()
   }
 
   private func setupUI() {
@@ -78,55 +78,20 @@ public final class MapViewController: BaseViewController {
     naverMapView.snp.makeConstraints {
       $0.edges.equalTo(view.safeAreaLayoutGuide)
     }
-    
+
     view.addSubview(myLocationButton)
     myLocationButton.snp.makeConstraints {
       $0.width.height.equalTo(48)
       $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
       $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
     }
-    
+
     let cameraPosition = NMFCameraPosition(
       NMGLatLng(lat: Constant.defaultLatitude, lng: Constant.defaultLongitude),
       zoom: Constant.defaultZoom
     )
     mapView.moveCamera(NMFCameraUpdate(position: cameraPosition))
-
-    addSampleMarkers()
-  }
-
-  private func addSampleMarkers() {
-    // Lotto marker
-    let lotto = LottoMarker()
-    lotto.position = NMGLatLng(lat: Constant.defaultLatitude + 0.002, lng: Constant.defaultLongitude - 0.002)
-    lotto.captionText = "복권 판매점"
-    lotto.touchHandler = { [weak self] _ in
-      self?.selectMarker(type: .lotto)
-      return true
-    }
-    lotto.mapView = mapView
-    lottoMarker = lotto
-
-    // ATM marker
-    let atm = ATMMarker()
-    atm.position = NMGLatLng(lat: Constant.defaultLatitude - 0.002, lng: Constant.defaultLongitude + 0.002)
-    atm.captionText = "ATM"
-    atm.touchHandler = { [weak self] _ in
-      self?.selectMarker(type: .atm)
-      return true
-    }
-    atm.mapView = mapView
-    atmMarker = atm
-  }
-
-  private enum MarkerType {
-    case lotto
-    case atm
-  }
-
-  private func selectMarker(type: MarkerType) {
-    lottoMarker?.isSelected = (type == .lotto)
-    atmMarker?.isSelected = (type == .atm)
+    mapView.addCameraDelegate(delegate: self)
   }
 
   private func setupBinding() {
@@ -141,10 +106,10 @@ public final class MapViewController: BaseViewController {
       }
       .store(in: &cancellables)
 
-    viewModel.output.places
+    viewModel.output.lottoStores
       .receive(on: DispatchQueue.main)
-      .sink { [weak self] _ in
-        self?.updateMapAnnotations()
+      .sink { [weak self] stores in
+        self?.updateLottoMarkers(stores: stores)
       }
       .store(in: &cancellables)
 
@@ -155,14 +120,14 @@ public final class MapViewController: BaseViewController {
         self.showErrorPopup(action: retryAction)
       }
       .store(in: &cancellables)
-    
+
     viewModel.output.locationAuthorizationStatus
       .receive(on: DispatchQueue.main)
       .sink { [weak self] status in
         self?.handleAuthorizationStatus(status)
       }
       .store(in: &cancellables)
-    
+
     viewModel.output.currentLocation
       .compactMap { $0 }
       .receive(on: DispatchQueue.main)
@@ -170,26 +135,32 @@ public final class MapViewController: BaseViewController {
         self?.handleLocationUpdate(location)
       }
       .store(in: &cancellables)
-    
+
     viewModel.output.shouldShowLocationDeniedAlert
       .receive(on: DispatchQueue.main)
       .sink { [weak self] in
         self?.showLocationPermissionDeniedAlert()
       }
       .store(in: &cancellables)
+
+    viewModel.output.selectedStore
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] store in
+        self?.handleStoreSelected(store: store)
+      }
+      .store(in: &cancellables)
   }
-  
+
   private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
     switch status {
     case .authorizedWhenInUse, .authorizedAlways:
-      // 권한 승인 - 위치 모드 활성화
       mapView.positionMode = .direction
       updateMyLocationButtonAppearance(for: mapView.positionMode)
     default:
       break
     }
   }
-  
+
   private func handleLocationUpdate(_ location: CLLocation) {
     let cameraPosition = NMFCameraPosition(
       NMGLatLng(lat: location.coordinate.latitude, lng: location.coordinate.longitude),
@@ -199,25 +170,25 @@ public final class MapViewController: BaseViewController {
     cameraUpdate.animation = .easeIn
     mapView.moveCamera(cameraUpdate)
   }
-  
+
   private func showLocationPermissionDeniedAlert() {
     let alert = UIAlertController(
       title: "위치 서비스 사용 권한 확인",
       message: "서비스 이용을 위해 위치 서비스 사용 설정이 필요합니다.\n기기 또는 시뮬레이터에서 위치 사용 권한을 켜주세요.",
       preferredStyle: .alert
     )
-    
+
     let settingsAction = UIAlertAction(title: "설정", style: .default) { _ in
       if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
         UIApplication.shared.open(settingsURL)
       }
     }
-    
+
     let cancelAction = UIAlertAction(title: "취소", style: .cancel)
-    
+
     alert.addAction(cancelAction)
     alert.addAction(settingsAction)
-    
+
     present(alert, animated: true)
   }
 
@@ -235,7 +206,7 @@ public final class MapViewController: BaseViewController {
       return .normal
     }
   }
-  
+
   private func updateMyLocationButtonAppearance(for mode: NMFMyPositionMode) {
     switch mode {
     case .disabled:
@@ -252,52 +223,79 @@ public final class MapViewController: BaseViewController {
       myLocationButton.tintColor = STColors.primary2.color
     }
   }
-  
+
   @objc private func didTapMyLocation() {
     let newMode = nextPositionMode(from: mapView.positionMode)
     mapView.positionMode = newMode
     updateMyLocationButtonAppearance(for: newMode)
   }
 
-  private func updateMapAnnotations() {
-    markers.forEach { $0.mapView = nil }
-    markers.removeAll()
-    
-    let places = viewModel.output.places.value
-    
-    for place in places {
-      let marker = NMFMarker()
-      marker.position = NMGLatLng(lat: place.latitude, lng: place.longitude)
-      marker.captionText = place.name
-      marker.iconTintColor = STColors.primary1.color
-      marker.mapView = mapView
-      
-      marker.touchHandler = { [weak self] (overlay) -> Bool in
-        self?.viewModel.send(input: .placeTapped(place: place))
-        
-        let cameraPosition = NMFCameraPosition(
-          NMGLatLng(lat: place.latitude, lng: place.longitude),
-          zoom: 17.0
-        )
-        let cameraUpdate = NMFCameraUpdate(position: cameraPosition)
-        cameraUpdate.animation = .easeIn
-        self?.mapView.moveCamera(cameraUpdate)
-        
-        return true
-      }
-      
-      markers.append(marker)
+  private func notifyMapBoundsChanged() {
+    let bounds = mapView.contentBounds
+    let mapBounds = MapBounds(
+      minLat: bounds.southWestLat,
+      maxLat: bounds.northEastLat,
+      minLng: bounds.southWestLng,
+      maxLng: bounds.northEastLng
+    )
+    viewModel.send(input: .mapBoundsChanged(bounds: mapBounds))
+  }
+
+  private func updateLottoMarkers(stores: [LottoStore]) {
+    let newStoreIds = Set(stores.map { $0.id })
+    let existingIds = Set(lottoMarkers.keys)
+
+    // 삭제된 마커 제거
+    let removedIds = existingIds.subtracting(newStoreIds)
+    for id in removedIds {
+      lottoMarkers[id]?.mapView = nil
+      lottoMarkers.removeValue(forKey: id)
     }
-    
-    if let firstPlace = places.first {
+
+    // 새로운 마커 추가
+    for store in stores {
+      if lottoMarkers[store.id] == nil {
+        let marker = LottoMarker()
+        marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
+        marker.captionText = store.name
+        marker.touchHandler = { [weak self] _ in
+          self?.viewModel.send(input: .storeTapped(store: store))
+          return true
+        }
+        marker.mapView = mapView
+        lottoMarkers[store.id] = marker
+      }
+    }
+  }
+
+  private func handleStoreSelected(store: LottoStore?) {
+    // 이전 선택 해제
+    if let previousId = selectedStoreId, let previousMarker = lottoMarkers[previousId] {
+      previousMarker.isSelected = false
+    }
+
+    // 새로운 선택
+    if let store = store, let marker = lottoMarkers[store.id] {
+      marker.isSelected = true
+      selectedStoreId = store.id
+
       let cameraPosition = NMFCameraPosition(
-        NMGLatLng(lat: firstPlace.latitude, lng: firstPlace.longitude),
-        zoom: Constant.defaultZoom
+        NMGLatLng(lat: store.latitude, lng: store.longitude),
+        zoom: 17.0
       )
       let cameraUpdate = NMFCameraUpdate(position: cameraPosition)
       cameraUpdate.animation = .easeIn
       mapView.moveCamera(cameraUpdate)
+    } else {
+      selectedStoreId = nil
     }
+  }
+}
+
+// MARK: - NMFMapViewCameraDelegate
+extension MapViewController: NMFMapViewCameraDelegate {
+  public func mapViewCameraIdle(_ mapView: NMFMapView) {
+    notifyMapBoundsChanged()
   }
 }
 
@@ -305,4 +303,3 @@ public final class MapViewController: BaseViewController {
 #Preview {
   MapViewController(viewModel: MapViewModel())
 }
-
