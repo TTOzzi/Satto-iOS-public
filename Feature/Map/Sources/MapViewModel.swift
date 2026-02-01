@@ -30,6 +30,7 @@ public final class MapViewModel {
     case viewDidLoad
     case viewDidAppear
     case mapBoundsChanged(bounds: MapBounds)
+    case searchButtonTapped
     case storeTapped(store: LottoStore)
   }
 
@@ -41,6 +42,7 @@ public final class MapViewModel {
     let currentLocation = PassthroughSubject<CLLocation?, Never>()
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
     let selectedStore = PassthroughSubject<LottoStore?, Never>()
+    let shouldShowSearchButton = PassthroughSubject<Bool, Never>()
   }
 
   @Injected var locationService: LocationService
@@ -49,6 +51,7 @@ public final class MapViewModel {
   let output = Output()
   private var cancellables = Set<AnyCancellable>()
   private var currentBounds: MapBounds?
+  private var hasInitiallyLoaded = false
 
   public init() {
     setupLocationBinding()
@@ -64,6 +67,9 @@ public final class MapViewModel {
 
     case .mapBoundsChanged(let bounds):
       handleMapBoundsChanged(bounds: bounds)
+
+    case .searchButtonTapped:
+      handleSearchButtonTapped()
 
     case .storeTapped(let store):
       handleStoreTapped(store: store)
@@ -114,6 +120,20 @@ public final class MapViewModel {
 
   private func handleMapBoundsChanged(bounds: MapBounds) {
     currentBounds = bounds
+
+    if !hasInitiallyLoaded {
+      // 최초 진입 시 자동 조회
+      fetchLottoStores(bounds: bounds)
+      hasInitiallyLoaded = true
+    } else {
+      // 이후 지도 이동 시 버튼 표시
+      output.shouldShowSearchButton.send(true)
+    }
+  }
+
+  private func handleSearchButtonTapped() {
+    guard let bounds = currentBounds else { return }
+    output.shouldShowSearchButton.send(false)
     fetchLottoStores(bounds: bounds)
   }
 

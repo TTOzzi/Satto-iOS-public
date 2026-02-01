@@ -32,6 +32,21 @@ public final class MapViewController: BaseViewController {
   }
   private var lottoMarkers: [String: LottoMarker] = [:]
   private var selectedStoreId: String?
+  private lazy var searchButton = UIButton(type: .system).then {
+    $0.setTitle("현 지도에서 검색", for: .normal)
+    $0.setTitleColor(STColors.primary1.color, for: .normal)
+    $0.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+    $0.backgroundColor = .white
+    $0.layer.cornerRadius = 16
+    $0.layer.shadowColor = UIColor.black.cgColor
+    $0.layer.shadowOpacity = 0.1
+    $0.layer.shadowRadius = 6
+    $0.layer.shadowOffset = CGSize(width: 0, height: 2)
+    $0.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+    $0.isHidden = true
+    $0.alpha = 0
+    $0.addTarget(self, action: #selector(didTapSearchButton), for: .touchUpInside)
+  }
   private lazy var myLocationButton = UIButton(type: .system).then {
     $0.backgroundColor = .white
     $0.layer.cornerRadius = 24
@@ -77,6 +92,12 @@ public final class MapViewController: BaseViewController {
     view.addSubview(naverMapView)
     naverMapView.snp.makeConstraints {
       $0.edges.equalTo(view.safeAreaLayoutGuide)
+    }
+
+    view.addSubview(searchButton)
+    searchButton.snp.makeConstraints {
+      $0.centerX.equalToSuperview()
+      $0.top.equalTo(view.safeAreaLayoutGuide).offset(16)
     }
 
     view.addSubview(myLocationButton)
@@ -147,6 +168,13 @@ public final class MapViewController: BaseViewController {
       .receive(on: DispatchQueue.main)
       .sink { [weak self] store in
         self?.handleStoreSelected(store: store)
+      }
+      .store(in: &cancellables)
+
+    viewModel.output.shouldShowSearchButton
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] shouldShow in
+        self?.updateSearchButtonVisibility(shouldShow: shouldShow)
       }
       .store(in: &cancellables)
   }
@@ -230,6 +258,10 @@ public final class MapViewController: BaseViewController {
     updateMyLocationButtonAppearance(for: newMode)
   }
 
+  @objc private func didTapSearchButton() {
+    viewModel.send(input: .searchButtonTapped)
+  }
+
   private func notifyMapBoundsChanged() {
     let bounds = mapView.contentBounds
     let mapBounds = MapBounds(
@@ -239,6 +271,21 @@ public final class MapViewController: BaseViewController {
       maxLng: bounds.northEastLng
     )
     viewModel.send(input: .mapBoundsChanged(bounds: mapBounds))
+  }
+
+  private func updateSearchButtonVisibility(shouldShow: Bool) {
+    if shouldShow {
+      searchButton.isHidden = false
+      UIView.animate(withDuration: 0.25) {
+        self.searchButton.alpha = 1
+      }
+    } else {
+      UIView.animate(withDuration: 0.25) {
+        self.searchButton.alpha = 0
+      } completion: { _ in
+        self.searchButton.isHidden = true
+      }
+    }
   }
 
   private func updateLottoMarkers(stores: [LottoStore]) {
