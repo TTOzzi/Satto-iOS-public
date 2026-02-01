@@ -61,6 +61,13 @@ public final class MapViewController: BaseViewController {
     $0.addTarget(self, action: #selector(didTapMyLocation), for: .touchUpInside)
     $0.accessibilityLabel = "현재 위치로 이동"
   }
+  private lazy var storeDetailBottomSheet = StoreDetailBottomSheetView().then {
+    $0.isHidden = true
+    $0.alpha = 0
+    $0.onCloseButtonTapped = { [weak self] in
+      self?.viewModel.send(input: .closeStoreDetail)
+    }
+  }
   private let viewModel: MapViewModel
 
   public init(viewModel: MapViewModel) {
@@ -91,7 +98,8 @@ public final class MapViewController: BaseViewController {
 
     view.addSubview(naverMapView)
     naverMapView.snp.makeConstraints {
-      $0.edges.equalTo(view.safeAreaLayoutGuide)
+      $0.top.leading.trailing.equalTo(view.safeAreaLayoutGuide)
+      $0.bottom.equalTo(view)
     }
 
     view.addSubview(searchButton)
@@ -105,6 +113,12 @@ public final class MapViewController: BaseViewController {
       $0.width.height.equalTo(48)
       $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
       $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
+    }
+
+    view.addSubview(storeDetailBottomSheet)
+    storeDetailBottomSheet.snp.makeConstraints {
+      $0.leading.trailing.equalToSuperview().inset(16)
+      $0.bottom.equalToSuperview().inset(24)
     }
 
     let cameraPosition = NMFCameraPosition(
@@ -175,6 +189,13 @@ public final class MapViewController: BaseViewController {
       .receive(on: DispatchQueue.main)
       .sink { [weak self] shouldShow in
         self?.updateSearchButtonVisibility(shouldShow: shouldShow)
+      }
+      .store(in: &cancellables)
+
+    viewModel.output.storeDetail
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] detail in
+        self?.handleStoreDetailUpdate(detail: detail)
       }
       .store(in: &cancellables)
   }
@@ -325,16 +346,58 @@ public final class MapViewController: BaseViewController {
     if let store = store, let marker = lottoMarkers[store.id] {
       marker.isSelected = true
       selectedStoreId = store.id
-
-      let cameraPosition = NMFCameraPosition(
-        NMGLatLng(lat: store.latitude, lng: store.longitude),
-        zoom: 17.0
-      )
-      let cameraUpdate = NMFCameraUpdate(position: cameraPosition)
-      cameraUpdate.animation = .easeIn
-      mapView.moveCamera(cameraUpdate)
     } else {
       selectedStoreId = nil
+    }
+  }
+
+  private func handleStoreDetailUpdate(detail: LottoStoreDetail?) {
+    if let detail = detail {
+      storeDetailBottomSheet.configure(with: detail)
+      showStoreDetailBottomSheet()
+    } else {
+      hideStoreDetailBottomSheet()
+    }
+  }
+
+  private func showStoreDetailBottomSheet() {
+    storeDetailBottomSheet.isHidden = false
+    storeDetailBottomSheet.transform = CGAffineTransform(translationX: 0, y: 200)
+
+    myLocationButton.snp.remakeConstraints {
+      $0.width.height.equalTo(48)
+      $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
+      $0.bottom.equalTo(storeDetailBottomSheet.snp.top).offset(-12)
+    }
+
+    UIView.animate(withDuration: 0.25) {
+      self.storeDetailBottomSheet.alpha = 1
+      self.storeDetailBottomSheet.transform = .identity
+      self.view.layoutIfNeeded()
+    }
+
+    if let tabBarController = tabBarController as? BaseTabBarController {
+      tabBarController.customTabBar.isHidden = true
+    }
+  }
+
+  private func hideStoreDetailBottomSheet() {
+    if let tabBarController = tabBarController as? BaseTabBarController {
+      tabBarController.customTabBar.isHidden = false
+    }
+
+    myLocationButton.snp.remakeConstraints {
+      $0.width.height.equalTo(48)
+      $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
+      $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
+    }
+
+    UIView.animate(withDuration: 0.25) {
+      self.storeDetailBottomSheet.alpha = 0
+      self.storeDetailBottomSheet.transform = CGAffineTransform(translationX: 0, y: 200)
+      self.view.layoutIfNeeded()
+    } completion: { _ in
+      self.storeDetailBottomSheet.isHidden = true
     }
   }
 }

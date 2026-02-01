@@ -38,6 +38,7 @@ public final class MapViewModel {
     case cameraIdle(bounds: MapBounds, reason: CameraMoveReason)
     case searchButtonTapped
     case storeTapped(store: LottoStore)
+    case closeStoreDetail
   }
 
   struct Output {
@@ -49,6 +50,7 @@ public final class MapViewModel {
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
     let selectedStore = PassthroughSubject<LottoStore?, Never>()
     let shouldShowSearchButton = CurrentValueSubject<Bool, Never>(false)
+    let storeDetail = PassthroughSubject<LottoStoreDetail?, Never>()
   }
 
   @Injected var locationService: LocationService
@@ -58,6 +60,7 @@ public final class MapViewModel {
   private var cancellables = Set<AnyCancellable>()
   private var currentBounds: MapBounds?
   private var hasInitiallyLoaded = false
+  private var selectedStoreId: String?
 
   public init() {
     setupLocationBinding()
@@ -79,6 +82,9 @@ public final class MapViewModel {
 
     case .storeTapped(let store):
       handleStoreTapped(store: store)
+
+    case .closeStoreDetail:
+      handleCloseStoreDetail()
     }
   }
 
@@ -154,7 +160,32 @@ public final class MapViewModel {
   }
 
   private func handleStoreTapped(store: LottoStore) {
+    guard selectedStoreId != store.id else { return }
+    selectedStoreId = store.id
     output.selectedStore.send(store)
+    fetchStoreDetail(storeId: store.id)
+  }
+
+  private func handleCloseStoreDetail() {
+    selectedStoreId = nil
+    output.selectedStore.send(nil)
+    output.storeDetail.send(nil)
+  }
+
+  private func fetchStoreDetail(storeId: String) {
+    output.isLoading.send(true)
+    Task {
+      do {
+        let detail = try await mapService.fetchStoreDetail(storeId: storeId)
+        output.storeDetail.send(detail)
+        output.isLoading.send(false)
+      } catch {
+        output.isLoading.send(false)
+        output.showError.send { [weak self] in
+          self?.fetchStoreDetail(storeId: storeId)
+        }
+      }
+    }
   }
 
   private func fetchLottoStores(bounds: MapBounds) {

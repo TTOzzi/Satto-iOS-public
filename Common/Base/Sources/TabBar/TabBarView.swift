@@ -12,7 +12,7 @@ import SnapKit
 import Then
 import UIKit
 
-final class TabBarView: UIView {
+public final class TabBarView: UIView {
 
   enum Constant {
     static let tabBarHeight: CGFloat = 72

@@ -35,3 +35,28 @@ struct LottoStore {
   let latitude: Double
   let longitude: Double
 }
+
+struct LottoStoreDetailDTO: Decodable {
+  let id: String
+  let name: String
+  let address: String
+  let phone: String?
+}
+
+extension LottoStoreDetailDTO {
+  func toDomain() -> LottoStoreDetail {
+    LottoStoreDetail(
+      id: id,
+      name: name,
+      address: address,
+      phone: phone
+    )
+  }
+}
+
+struct LottoStoreDetail {
+  let id: String
+  let name: String
+  let address: String
+  let phone: String?
+}

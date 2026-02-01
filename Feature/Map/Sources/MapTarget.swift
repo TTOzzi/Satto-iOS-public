@@ -35,4 +35,16 @@ enum MapTarget {
     let minLng: Double
     let maxLng: Double
   }
+
+  struct GetLottoStoreDetail: BaseTargetType {
+
+    typealias Response = LottoStoreDetailDTO
+
+    var path: String { "lotto-stores/\(storeId)" }
+    var httpTask: HTTPTask { .requestPlain }
+    var httpMethod: HTTPMethod { .get }
+    var headers: [String: String]? { nil }
+
+    let storeId: String
+  }
 }

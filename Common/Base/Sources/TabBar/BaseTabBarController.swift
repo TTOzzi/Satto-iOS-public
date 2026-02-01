@@ -13,7 +13,7 @@ import UIKit
 
 public final class BaseTabBarController: UITabBarController {
 
-  lazy var customTabBar = TabBarView().then {
+  public private(set) lazy var customTabBar = TabBarView().then {
     $0.backgroundColor = STColors.white.color
   }
   private var cancellables = Set<AnyCancellable>()

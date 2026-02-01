@@ -28,4 +28,10 @@ final class MapService {
     let response = try await networkProvider.request(target: target)
     return response.markers.map { $0.toDomain() }
   }
+
+  func fetchStoreDetail(storeId: String) async throws -> LottoStoreDetail {
+    let target = MapTarget.GetLottoStoreDetail(storeId: storeId)
+    let response = try await networkProvider.request(target: target)
+    return response.toDomain()
+  }
 }
