@@ -31,6 +31,8 @@ public final class MapViewController: BaseViewController {
     return naverMapView.mapView
   }
   private var markers: [NMFMarker] = []
+  private var lottoMarker: LottoMarker?
+  private var atmMarker: ATMMarker?
   private lazy var myLocationButton = UIButton(type: .system).then {
     $0.backgroundColor = .white
     $0.layer.cornerRadius = 24
@@ -89,6 +91,24 @@ public final class MapViewController: BaseViewController {
       zoom: Constant.defaultZoom
     )
     mapView.moveCamera(NMFCameraUpdate(position: cameraPosition))
+
+    addSampleMarkers()
+  }
+
+  private func addSampleMarkers() {
+    // Lotto marker
+    let lotto = LottoMarker()
+    lotto.position = NMGLatLng(lat: Constant.defaultLatitude + 0.002, lng: Constant.defaultLongitude - 0.002)
+    lotto.captionText = "복권 판매점"
+    lotto.mapView = mapView
+    lottoMarker = lotto
+
+    // ATM marker
+    let atm = ATMMarker()
+    atm.position = NMGLatLng(lat: Constant.defaultLatitude - 0.002, lng: Constant.defaultLongitude + 0.002)
+    atm.captionText = "ATM"
+    atm.mapView = mapView
+    atmMarker = atm
   }
 
   private func setupBinding() {
