@@ -100,6 +100,10 @@ public final class MapViewController: BaseViewController {
     let lotto = LottoMarker()
     lotto.position = NMGLatLng(lat: Constant.defaultLatitude + 0.002, lng: Constant.defaultLongitude - 0.002)
     lotto.captionText = "복권 판매점"
+    lotto.touchHandler = { [weak self] _ in
+      self?.selectMarker(type: .lotto)
+      return true
+    }
     lotto.mapView = mapView
     lottoMarker = lotto
 
@@ -107,8 +111,22 @@ public final class MapViewController: BaseViewController {
     let atm = ATMMarker()
     atm.position = NMGLatLng(lat: Constant.defaultLatitude - 0.002, lng: Constant.defaultLongitude + 0.002)
     atm.captionText = "ATM"
+    atm.touchHandler = { [weak self] _ in
+      self?.selectMarker(type: .atm)
+      return true
+    }
     atm.mapView = mapView
     atmMarker = atm
+  }
+
+  private enum MarkerType {
+    case lotto
+    case atm
+  }
+
+  private func selectMarker(type: MarkerType) {
+    lottoMarker?.isSelected = (type == .lotto)
+    atmMarker?.isSelected = (type == .atm)
   }
 
   private func setupBinding() {

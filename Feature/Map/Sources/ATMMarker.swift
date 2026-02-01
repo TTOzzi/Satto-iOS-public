@@ -10,8 +10,22 @@ import NMapsMap
 
 public final class ATMMarker: NMFMarker {
 
+  public var isSelected: Bool = false {
+    didSet {
+      updateIcon()
+    }
+  }
+
   public override init() {
     super.init()
-    iconImage = NMFOverlayImage(image: STImages.pinATM.image)
+    updateIcon()
+  }
+
+  private func updateIcon() {
+    if isSelected {
+      iconImage = NMFOverlayImage(image: STImages.pinATMSelected.image)
+    } else {
+      iconImage = NMFOverlayImage(image: STImages.pinATM.image)
+    }
   }
 }
