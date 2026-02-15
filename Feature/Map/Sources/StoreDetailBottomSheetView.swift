@@ -181,7 +181,7 @@ final class StoreDetailBottomSheetView: UIView {
     dividerView.layer.addSublayer(shapeLayer)
   }
 
-  func configure(with store: LottoStoreDetail) {
+  func configure(with store: MapPOIDetail) {
     nameLabel.text = store.name
     addressLabel.text = store.address
 

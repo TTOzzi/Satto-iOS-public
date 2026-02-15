@@ -31,7 +31,8 @@ public final class MapViewController: BaseViewController {
     return naverMapView.mapView
   }
   private var lottoMarkers: [String: LottoMarker] = [:]
-  private var selectedStoreId: String?
+  private var atmMarkers: [String: ATMMarker] = [:]
+  private var selectedPOI: MapPOI?
   private var nextCameraMoveReason: CameraMoveReason = .initial
   private lazy var searchButton = UIButton(type: .system).then {
     $0.setTitle("현 지도에서 검색", for: .normal)
@@ -148,6 +149,13 @@ public final class MapViewController: BaseViewController {
       }
       .store(in: &cancellables)
 
+    viewModel.output.atmStores
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] stores in
+        self?.updateATMMarkers(stores: stores)
+      }
+      .store(in: &cancellables)
+
     viewModel.output.showError
       .receive(on: DispatchQueue.main)
       .sink { [weak self] retryAction in
@@ -178,10 +186,10 @@ public final class MapViewController: BaseViewController {
       }
       .store(in: &cancellables)
 
-    viewModel.output.selectedStore
+    viewModel.output.selectedPOI
       .receive(on: DispatchQueue.main)
-      .sink { [weak self] store in
-        self?.handleStoreSelected(store: store)
+      .sink { [weak self] poi in
+        self?.handlePOISelected(poi: poi)
       }
       .store(in: &cancellables)
 
@@ -192,10 +200,10 @@ public final class MapViewController: BaseViewController {
       }
       .store(in: &cancellables)
 
-    viewModel.output.storeDetail
+    viewModel.output.poiDetail
       .receive(on: DispatchQueue.main)
       .sink { [weak self] detail in
-        self?.handleStoreDetailUpdate(detail: detail)
+        self?.handlePOIDetailUpdate(detail: detail)
       }
       .store(in: &cancellables)
   }
@@ -309,7 +317,7 @@ public final class MapViewController: BaseViewController {
     }
   }
 
-  private func updateLottoMarkers(stores: [LottoStore]) {
+  private func updateLottoMarkers(stores: [MapPOI]) {
     let newStoreIds = Set(stores.map { $0.id })
     let existingIds = Set(lottoMarkers.keys)
 
@@ -327,31 +335,70 @@ public final class MapViewController: BaseViewController {
         marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
         marker.captionText = store.name
         marker.touchHandler = { [weak self] _ in
-          self?.viewModel.send(input: .storeTapped(store: store))
+          self?.viewModel.send(input: .poiTapped(poi: store))
           return true
         }
+        marker.isSelected = selectedPOI?.uniqueId == store.uniqueId
         marker.mapView = mapView
         lottoMarkers[store.id] = marker
       }
     }
   }
 
-  private func handleStoreSelected(store: LottoStore?) {
-    // 이전 선택 해제
-    if let previousId = selectedStoreId, let previousMarker = lottoMarkers[previousId] {
-      previousMarker.isSelected = false
+  private func updateATMMarkers(stores: [MapPOI]) {
+    let newStoreIds = Set(stores.map { $0.id })
+    let existingIds = Set(atmMarkers.keys)
+
+    // 삭제된 마커 제거
+    let removedIds = existingIds.subtracting(newStoreIds)
+    for id in removedIds {
+      atmMarkers[id]?.mapView = nil
+      atmMarkers.removeValue(forKey: id)
     }
 
-    // 새로운 선택
-    if let store = store, let marker = lottoMarkers[store.id] {
-      marker.isSelected = true
-      selectedStoreId = store.id
-    } else {
-      selectedStoreId = nil
+    // 새로운 마커 추가
+    for store in stores {
+      if atmMarkers[store.id] == nil {
+        let marker = ATMMarker()
+        marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
+        marker.captionText = store.name
+        marker.touchHandler = { [weak self] _ in
+          self?.viewModel.send(input: .poiTapped(poi: store))
+          return true
+        }
+        marker.isSelected = selectedPOI?.uniqueId == store.uniqueId
+        marker.mapView = mapView
+        atmMarkers[store.id] = marker
+      }
     }
   }
 
-  private func handleStoreDetailUpdate(detail: LottoStoreDetail?) {
+  private func handlePOISelected(poi: MapPOI?) {
+    // 이전 선택 해제
+    if let previousPOI = selectedPOI {
+      switch previousPOI.type {
+      case .lottoStore:
+        lottoMarkers[previousPOI.id]?.isSelected = false
+      case .atm:
+        atmMarkers[previousPOI.id]?.isSelected = false
+      }
+    }
+
+    // 새로운 선택
+    if let poi {
+      switch poi.type {
+      case .lottoStore:
+        lottoMarkers[poi.id]?.isSelected = true
+      case .atm:
+        atmMarkers[poi.id]?.isSelected = true
+      }
+      selectedPOI = poi
+    } else {
+      selectedPOI = nil
+    }
+  }
+
+  private func handlePOIDetailUpdate(detail: MapPOIDetail?) {
     if let detail = detail {
       storeDetailBottomSheet.configure(with: detail)
       showStoreDetailBottomSheet()

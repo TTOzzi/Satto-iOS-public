@@ -7,56 +7,44 @@
 
 import Foundation
 
-struct LottoStoreListDTO: Decodable {
-  let markers: [LottoStoreDTO]
+struct MapMarkerListDTO: Decodable {
+  let markers: [MapMarkerDTO]
 }
 
-struct LottoStoreDTO: Decodable {
+struct MapMarkerDTO: Decodable {
   let id: String
   let name: String
   let latitude: String
   let longitude: String
 }
 
-extension LottoStoreDTO {
-  func toDomain() -> LottoStore {
-    LottoStore(
+extension MapMarkerDTO {
+  func toDomain(type: MapPOIType) -> MapPOI {
+    MapPOI(
       id: id,
       name: name,
       latitude: Double(latitude) ?? 0,
-      longitude: Double(longitude) ?? 0
+      longitude: Double(longitude) ?? 0,
+      type: type
     )
   }
 }
 
-struct LottoStore {
-  let id: String
-  let name: String
-  let latitude: Double
-  let longitude: Double
-}
-
-struct LottoStoreDetailDTO: Decodable {
+struct MapDetailDTO: Decodable {
   let id: String
   let name: String
   let address: String
   let phone: String?
 }
 
-extension LottoStoreDetailDTO {
-  func toDomain() -> LottoStoreDetail {
-    LottoStoreDetail(
+extension MapDetailDTO {
+  func toDomain(type: MapPOIType) -> MapPOIDetail {
+    MapPOIDetail(
       id: id,
       name: name,
       address: address,
-      phone: phone
+      phone: phone,
+      type: type
     )
   }
-}
-
-struct LottoStoreDetail {
-  let id: String
-  let name: String
-  let address: String
-  let phone: String?
 }

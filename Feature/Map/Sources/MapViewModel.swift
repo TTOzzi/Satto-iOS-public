@@ -37,20 +37,23 @@ public final class MapViewModel {
     case viewDidAppear
     case cameraIdle(bounds: MapBounds, reason: CameraMoveReason)
     case searchButtonTapped
-    case storeTapped(store: LottoStore)
+    case poiTapped(poi: MapPOI)
+    case filterChanged(filter: MapPOIFilter)
     case closeStoreDetail
   }
 
   struct Output {
-    let lottoStores = CurrentValueSubject<[LottoStore], Never>([])
+    let lottoStores = CurrentValueSubject<[MapPOI], Never>([])
+    let atmStores = CurrentValueSubject<[MapPOI], Never>([])
     let isLoading = PassthroughSubject<Bool, Never>()
     let showError = PassthroughSubject<() -> Void, Never>()
     let locationAuthorizationStatus = PassthroughSubject<CLAuthorizationStatus, Never>()
     let currentLocation = PassthroughSubject<CLLocation?, Never>()
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
-    let selectedStore = PassthroughSubject<LottoStore?, Never>()
+    let selectedPOI = PassthroughSubject<MapPOI?, Never>()
     let shouldShowSearchButton = CurrentValueSubject<Bool, Never>(false)
-    let storeDetail = PassthroughSubject<LottoStoreDetail?, Never>()
+    let poiDetail = PassthroughSubject<MapPOIDetail?, Never>()
+    let selectedFilter = CurrentValueSubject<MapPOIFilter, Never>(.all)
   }
 
   @Injected var locationService: LocationService
@@ -60,7 +63,8 @@ public final class MapViewModel {
   private var cancellables = Set<AnyCancellable>()
   private var currentBounds: MapBounds?
   private var hasInitiallyLoaded = false
-  private var selectedStoreId: String?
+  private var selectedPOIUniqueId: String?
+  private var currentFilter: MapPOIFilter = .all
 
   public init() {
     setupLocationBinding()
@@ -80,8 +84,11 @@ public final class MapViewModel {
     case .searchButtonTapped:
       handleSearchButtonTapped()
 
-    case .storeTapped(let store):
-      handleStoreTapped(store: store)
+    case .poiTapped(let poi):
+      handlePOITapped(poi: poi)
+
+    case .filterChanged(let filter):
+      handleFilterChanged(filter: filter)
 
     case .closeStoreDetail:
       handleCloseStoreDetail()
@@ -137,7 +144,7 @@ public final class MapViewModel {
     case .initial:
       // 최초 진입 시 자동 조회
       if !hasInitiallyLoaded {
-        fetchLottoStores(bounds: bounds)
+        fetchPOIs(bounds: bounds)
         hasInitiallyLoaded = true
       }
 
@@ -156,55 +163,69 @@ public final class MapViewModel {
   private func handleSearchButtonTapped() {
     guard let bounds = currentBounds else { return }
     output.shouldShowSearchButton.send(false)
-    fetchLottoStores(bounds: bounds)
+    fetchPOIs(bounds: bounds)
   }
 
-  private func handleStoreTapped(store: LottoStore) {
-    guard selectedStoreId != store.id else { return }
-    selectedStoreId = store.id
-    output.selectedStore.send(store)
-    fetchStoreDetail(storeId: store.id)
+  private func handlePOITapped(poi: MapPOI) {
+    guard selectedPOIUniqueId != poi.uniqueId else { return }
+    selectedPOIUniqueId = poi.uniqueId
+    output.selectedPOI.send(poi)
+    fetchPOIDetail(poi: poi)
+  }
+
+  private func handleFilterChanged(filter: MapPOIFilter) {
+    guard currentFilter != filter else { return }
+
+    currentFilter = filter
+    output.selectedFilter.send(filter)
+    handleCloseStoreDetail()
+    output.shouldShowSearchButton.send(false)
+
+    guard let bounds = currentBounds else { return }
+    fetchPOIs(bounds: bounds)
   }
 
   private func handleCloseStoreDetail() {
-    selectedStoreId = nil
-    output.selectedStore.send(nil)
-    output.storeDetail.send(nil)
+    selectedPOIUniqueId = nil
+    output.selectedPOI.send(nil)
+    output.poiDetail.send(nil)
   }
 
-  private func fetchStoreDetail(storeId: String) {
+  private func fetchPOIDetail(poi: MapPOI) {
     output.isLoading.send(true)
     Task {
       do {
-        let detail = try await mapService.fetchStoreDetail(storeId: storeId)
-        output.storeDetail.send(detail)
+        let detail = try await mapService.fetchPOIDetail(poi: poi)
+        output.poiDetail.send(detail)
         output.isLoading.send(false)
       } catch {
         output.isLoading.send(false)
         output.showError.send { [weak self] in
-          self?.fetchStoreDetail(storeId: storeId)
+          self?.fetchPOIDetail(poi: poi)
         }
       }
     }
   }
 
-  private func fetchLottoStores(bounds: MapBounds) {
+  private func fetchPOIs(bounds: MapBounds) {
     output.isLoading.send(true)
     Task {
       do {
-        let stores = try await mapService.fetchLottoStores(
+        let result = try await mapService.fetchPOIs(
           minLat: bounds.minLat,
           maxLat: bounds.maxLat,
           minLng: bounds.minLng,
-          maxLng: bounds.maxLng
+          maxLng: bounds.maxLng,
+          filter: currentFilter
         )
-        output.lottoStores.send(stores)
+        output.lottoStores.send(result.lottoStores)
+        output.atmStores.send(result.atms)
         output.isLoading.send(false)
       } catch {
         output.isLoading.send(false)
         output.showError.send { [weak self] in
           guard let self, let bounds = self.currentBounds else { return }
-          self.fetchLottoStores(bounds: bounds)
+          self.fetchPOIs(bounds: bounds)
         }
       }
     }
