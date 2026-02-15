@@ -19,6 +19,7 @@ public final class ATMMarker: NMFMarker {
   public override init() {
     super.init()
     updateIcon()
+    captionRequestedWidth = 75
   }
 
   private func updateIcon() {
