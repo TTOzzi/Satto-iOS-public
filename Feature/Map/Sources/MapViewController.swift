@@ -30,9 +30,21 @@ public final class MapViewController: BaseViewController {
   private var mapView: NMFMapView {
     return naverMapView.mapView
   }
+  private lazy var filterStackView = UIStackView().then {
+    $0.axis = .horizontal
+    $0.spacing = 8
+    $0.alignment = .center
+  }
+  private lazy var lottoFilterButton = MapFilterChipButton(kind: .lottoStore).then {
+    $0.addTarget(self, action: #selector(didTapLottoFilterButton), for: .touchUpInside)
+  }
+  private lazy var atmFilterButton = MapFilterChipButton(kind: .atm).then {
+    $0.addTarget(self, action: #selector(didTapATMFilterButton), for: .touchUpInside)
+  }
   private var lottoMarkers: [String: LottoMarker] = [:]
   private var atmMarkers: [String: ATMMarker] = [:]
   private var selectedPOI: MapPOI?
+  private var selectedFilter: MapPOIFilter = .all
   private var nextCameraMoveReason: CameraMoveReason = .initial
   private lazy var searchButton = UIButton(type: .system).then {
     $0.setTitle("현 지도에서 검색", for: .normal)
@@ -103,10 +115,18 @@ public final class MapViewController: BaseViewController {
       $0.bottom.equalTo(view)
     }
 
+    view.addSubview(filterStackView)
+    filterStackView.snp.makeConstraints {
+      $0.centerX.equalToSuperview()
+      $0.top.equalTo(view.safeAreaLayoutGuide).offset(16)
+    }
+    filterStackView.addArrangedSubview(lottoFilterButton)
+    filterStackView.addArrangedSubview(atmFilterButton)
+
     view.addSubview(searchButton)
     searchButton.snp.makeConstraints {
       $0.centerX.equalToSuperview()
-      $0.top.equalTo(view.safeAreaLayoutGuide).offset(16)
+      $0.top.equalTo(filterStackView.snp.bottom).offset(10)
     }
 
     view.addSubview(myLocationButton)
@@ -206,6 +226,13 @@ public final class MapViewController: BaseViewController {
         self?.handlePOIDetailUpdate(detail: detail)
       }
       .store(in: &cancellables)
+
+    viewModel.output.selectedFilter
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] filter in
+        self?.applyFilterUI(filter: filter)
+      }
+      .store(in: &cancellables)
   }
 
   private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
@@ -290,6 +317,16 @@ public final class MapViewController: BaseViewController {
 
   @objc private func didTapSearchButton() {
     viewModel.send(input: .searchButtonTapped)
+  }
+
+  @objc private func didTapLottoFilterButton() {
+    let nextFilter: MapPOIFilter = selectedFilter == .lottoStore ? .all : .lottoStore
+    viewModel.send(input: .filterChanged(filter: nextFilter))
+  }
+
+  @objc private func didTapATMFilterButton() {
+    let nextFilter: MapPOIFilter = selectedFilter == .atm ? .all : .atm
+    viewModel.send(input: .filterChanged(filter: nextFilter))
   }
 
   private func currentMapBounds() -> MapBounds {
@@ -405,6 +442,12 @@ public final class MapViewController: BaseViewController {
     } else {
       hideStoreDetailBottomSheet()
     }
+  }
+
+  private func applyFilterUI(filter: MapPOIFilter) {
+    selectedFilter = filter
+    lottoFilterButton.isChipSelected = filter == .lottoStore
+    atmFilterButton.isChipSelected = filter == .atm
   }
 
   private func showStoreDetailBottomSheet() {
