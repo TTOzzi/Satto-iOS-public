@@ -19,6 +19,7 @@ public final class MapViewController: BaseViewController {
     static let defaultLatitude: Double = 37.5665
     static let defaultLongitude: Double = 126.9780
     static let defaultZoom: Double = 15.0
+    static let markerLabelHideThreshold: Int = 10
   }
 
   private lazy var naverMapView = NMFNaverMapView().then {
@@ -43,6 +44,8 @@ public final class MapViewController: BaseViewController {
   }
   private var lottoMarkers: [String: LottoMarker] = [:]
   private var atmMarkers: [String: ATMMarker] = [:]
+  private var lottoMarkerNames: [String: String] = [:]
+  private var atmMarkerNames: [String: String] = [:]
   private var selectedPOI: MapPOI?
   private var selectedFilter: MapPOIFilter = .all
   private var nextCameraMoveReason: CameraMoveReason = .initial
@@ -363,10 +366,12 @@ public final class MapViewController: BaseViewController {
     for id in removedIds {
       lottoMarkers[id]?.mapView = nil
       lottoMarkers.removeValue(forKey: id)
+      lottoMarkerNames.removeValue(forKey: id)
     }
 
     // 새로운 마커 추가
     for store in stores {
+      lottoMarkerNames[store.id] = store.name
       if lottoMarkers[store.id] == nil {
         let marker = LottoMarker()
         marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
@@ -380,6 +385,8 @@ public final class MapViewController: BaseViewController {
         lottoMarkers[store.id] = marker
       }
     }
+
+    updateMarkerCaptionVisibility()
   }
 
   private func updateATMMarkers(stores: [MapPOI]) {
@@ -391,10 +398,12 @@ public final class MapViewController: BaseViewController {
     for id in removedIds {
       atmMarkers[id]?.mapView = nil
       atmMarkers.removeValue(forKey: id)
+      atmMarkerNames.removeValue(forKey: id)
     }
 
     // 새로운 마커 추가
     for store in stores {
+      atmMarkerNames[store.id] = store.name
       if atmMarkers[store.id] == nil {
         let marker = ATMMarker()
         marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
@@ -408,6 +417,8 @@ public final class MapViewController: BaseViewController {
         atmMarkers[store.id] = marker
       }
     }
+
+    updateMarkerCaptionVisibility()
   }
 
   private func handlePOISelected(poi: MapPOI?) {
@@ -448,6 +459,19 @@ public final class MapViewController: BaseViewController {
     selectedFilter = filter
     lottoFilterButton.isChipSelected = filter == .lottoStore
     atmFilterButton.isChipSelected = filter == .atm
+  }
+
+  private func updateMarkerCaptionVisibility() {
+    let totalMarkerCount = lottoMarkers.count + atmMarkers.count
+    let shouldHideCaption = totalMarkerCount > Constant.markerLabelHideThreshold
+
+    for (id, marker) in lottoMarkers {
+      marker.captionText = shouldHideCaption ? "" : (lottoMarkerNames[id] ?? "")
+    }
+
+    for (id, marker) in atmMarkers {
+      marker.captionText = shouldHideCaption ? "" : (atmMarkerNames[id] ?? "")
+    }
   }
 
   private func showStoreDetailBottomSheet() {
