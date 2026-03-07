@@ -19,6 +19,7 @@ struct AppLayer: Layer {
             "CFBundleShortVersionString": "$(MARKETING_VERSION)",
             "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
             "ITSAppUsesNonExemptEncryption": false,
+            "NSLocationWhenInUseUsageDescription": "위치 정보를 기반으로 현재 위치, 주변 검색, 길찾기 정보, 컨텐츠 추천 및 광고를 제공합니다",
             "UILaunchStoryboardName": "LaunchScreen",
             "UIUserInterfaceStyle": "Light",
             "UISupportedInterfaceOrientations": [

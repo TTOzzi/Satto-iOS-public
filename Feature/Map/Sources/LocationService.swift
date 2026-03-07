@@ -51,7 +51,8 @@ final class LocationService: NSObject {
     case .notDetermined:
       locationManager.requestWhenInUseAuthorization()
     case .denied, .restricted:
-      break
+      // Re-emit denied/restricted status so UI can react when map tab is revisited.
+      authorizationStatusSubject.send(status)
     case .authorizedWhenInUse, .authorizedAlways:
       startUpdatingLocation()
     @unknown default:
