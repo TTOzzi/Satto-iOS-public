@@ -67,6 +67,8 @@ public final class MapViewModel {
   private var currentFilter: MapPOIFilter = .all
   private var poiFetchTask: Task<Void, Never>?
   private var poiDetailFetchTask: Task<Void, Never>?
+  private var isTabEntryAuthorizationCheckPending = false
+  private var hasShownDeniedAlert = false
 
   public init() {
     setupLocationBinding()
@@ -128,19 +130,26 @@ public final class MapViewModel {
   }
 
   private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
+    guard isTabEntryAuthorizationCheckPending else { return }
+
     switch status {
     case .restricted, .denied:
-      output.shouldShowLocationDeniedAlert.send(())
+      if !hasShownDeniedAlert {
+        output.shouldShowLocationDeniedAlert.send(())
+        hasShownDeniedAlert = true
+      }
+      isTabEntryAuthorizationCheckPending = false
     case .authorizedWhenInUse, .authorizedAlways:
-      break
+      isTabEntryAuthorizationCheckPending = false
     case .notDetermined:
       break
     @unknown default:
-      break
+      isTabEntryAuthorizationCheckPending = false
     }
   }
 
   private func handleViewDidAppear() {
+    isTabEntryAuthorizationCheckPending = true
     locationService.requestAuthorization()
   }
 
