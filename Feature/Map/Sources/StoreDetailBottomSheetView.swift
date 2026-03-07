@@ -24,37 +24,48 @@ final class StoreDetailBottomSheetView: UIView {
   }
 
   private let nameLabel = UILabel().then {
-    $0.font = .systemFont(ofSize: 18, weight: .bold)
-    $0.textColor = .black
+    $0.style = Typography.Body_18_B
+    $0.textColor = STColors.gray1.color
+    $0.numberOfLines = 1
+    $0.lineBreakMode = .byTruncatingTail
   }
 
   private lazy var closeButton = UIButton(type: .system).then {
     $0.setImage(STImages.xMark.image.withRenderingMode(.alwaysTemplate), for: .normal)
-    $0.tintColor = STColors.gray5.color
+    $0.tintColor = STColors.gray4.color
+    $0.backgroundColor = STColors.gray8.color
+    $0.layer.cornerRadius = 12
+    $0.clipsToBounds = true
     $0.addTarget(self, action: #selector(didTapCloseButton), for: .touchUpInside)
   }
 
+  private lazy var headerStackView = UIStackView(arrangedSubviews: [nameLabel, closeButton]).then {
+    $0.axis = .horizontal
+    $0.spacing = 20
+    $0.alignment = .center
+    $0.distribution = .fill
+  }
+
   private let addressIconView = UIImageView().then {
-    $0.image = UIImage(systemName: "location.fill")
-    $0.tintColor = STColors.primary1.color
+    $0.image = STImages.navigation.image
     $0.contentMode = .scaleAspectFit
   }
 
   private let addressLabel = UILabel().then {
-    $0.font = .systemFont(ofSize: 14, weight: .regular)
-    $0.textColor = .black
-    $0.numberOfLines = 0
+    $0.style = Typography.Body_14_M
+    $0.textColor = STColors.gray3.color
+    $0.numberOfLines = 1
+    $0.lineBreakMode = .byTruncatingTail
   }
 
   private let phoneIconView = UIImageView().then {
-    $0.image = UIImage(systemName: "phone.fill")
-    $0.tintColor = STColors.primary1.color
+    $0.image = STImages.phone.image
     $0.contentMode = .scaleAspectFit
   }
 
   private let phoneLabel = UILabel().then {
-    $0.font = .systemFont(ofSize: 14, weight: .regular)
-    $0.textColor = .black
+    $0.style = Typography.Body_14_M
+    $0.textColor = STColors.gray3.color
   }
 
   private let phoneStackView = UIStackView().then {
@@ -64,16 +75,14 @@ final class StoreDetailBottomSheetView: UIView {
   }
 
   private let contentContainerView = UIView().then {
-    $0.layer.borderColor = STColors.gray3.color.cgColor
+    $0.layer.borderColor = STColors.gray8.color.cgColor
     $0.layer.borderWidth = 1
-    $0.layer.cornerRadius = 8
+    $0.layer.cornerRadius = 6
   }
 
   private let dividerView = UIView().then {
     $0.backgroundColor = .clear
   }
-
-  private let phoneContainerView = UIView()
 
   private let contentStackView = UIStackView().then {
     $0.axis = .vertical
@@ -95,17 +104,17 @@ final class StoreDetailBottomSheetView: UIView {
       $0.edges.equalToSuperview()
     }
 
-    containerView.addSubview(nameLabel)
-    nameLabel.snp.makeConstraints {
+    nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    closeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+    closeButton.setContentHuggingPriority(.required, for: .horizontal)
+
+    containerView.addSubview(headerStackView)
+    headerStackView.snp.makeConstraints {
       $0.top.equalToSuperview().offset(20)
-      $0.leading.equalToSuperview().offset(20)
+      $0.leading.trailing.equalToSuperview().inset(20)
     }
 
-    containerView.addSubview(closeButton)
     closeButton.snp.makeConstraints {
-      $0.centerY.equalTo(nameLabel)
-      $0.trailing.equalToSuperview().inset(20)
-      $0.leading.greaterThanOrEqualTo(nameLabel.snp.trailing).offset(12)
       $0.width.height.equalTo(24)
     }
 
@@ -115,32 +124,21 @@ final class StoreDetailBottomSheetView: UIView {
     addressStackView.alignment = .center
 
     addressIconView.snp.makeConstraints {
-      $0.width.height.equalTo(18)
+      $0.width.height.equalTo(12)
     }
 
     phoneStackView.addArrangedSubview(phoneIconView)
     phoneStackView.addArrangedSubview(phoneLabel)
 
     phoneIconView.snp.makeConstraints {
-      $0.width.height.equalTo(18)
+      $0.width.height.equalTo(12)
     }
 
-    let addressContainerView = UIView()
-    addressContainerView.addSubview(addressStackView)
-    addressStackView.snp.makeConstraints {
-      $0.leading.trailing.equalToSuperview().inset(16)
-      $0.top.bottom.equalToSuperview().inset(14)
-    }
-
-    phoneContainerView.addSubview(phoneStackView)
-    phoneStackView.snp.makeConstraints {
-      $0.leading.trailing.equalToSuperview().inset(16)
-      $0.top.bottom.equalToSuperview().inset(14)
-    }
-
-    contentStackView.addArrangedSubview(addressContainerView)
+    contentStackView.addArrangedSubview(addressStackView)
     contentStackView.addArrangedSubview(dividerView)
-    contentStackView.addArrangedSubview(phoneContainerView)
+    contentStackView.addArrangedSubview(phoneStackView)
+    contentStackView.setCustomSpacing(10, after: addressStackView)
+    contentStackView.setCustomSpacing(10, after: dividerView)
 
     dividerView.snp.makeConstraints {
       $0.height.equalTo(1)
@@ -148,14 +146,14 @@ final class StoreDetailBottomSheetView: UIView {
 
     containerView.addSubview(contentContainerView)
     contentContainerView.snp.makeConstraints {
-      $0.top.equalTo(nameLabel.snp.bottom).offset(16)
+      $0.top.equalTo(headerStackView.snp.bottom).offset(12)
       $0.leading.trailing.equalToSuperview().inset(20)
-      $0.bottom.equalToSuperview().inset(20)
+      $0.bottom.equalToSuperview().inset(40)
     }
 
     contentContainerView.addSubview(contentStackView)
     contentStackView.snp.makeConstraints {
-      $0.edges.equalToSuperview()
+      $0.edges.equalToSuperview().inset(UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14))
     }
   }
 
@@ -168,30 +166,31 @@ final class StoreDetailBottomSheetView: UIView {
     dividerView.layer.sublayers?.removeAll(where: { $0 is CAShapeLayer })
 
     let shapeLayer = CAShapeLayer()
-    shapeLayer.strokeColor = STColors.gray3.color.cgColor
+    shapeLayer.strokeColor = STColors.gray8.color.cgColor
     shapeLayer.lineWidth = 1
     shapeLayer.lineDashPattern = [4, 4]
 
     let path = CGMutablePath()
     path.addLines(between: [
-      CGPoint(x: 16, y: 0),
-      CGPoint(x: dividerView.bounds.width - 16, y: 0)
+      CGPoint(x: 0, y: 0),
+      CGPoint(x: dividerView.bounds.width, y: 0)
     ])
     shapeLayer.path = path
     dividerView.layer.addSublayer(shapeLayer)
   }
 
   func configure(with store: MapPOIDetail) {
-    nameLabel.text = store.name
-    addressLabel.text = store.address
+    nameLabel.styledText = store.name
+    addressLabel.styledText = store.address
 
     if let phone = store.phone, !phone.isEmpty {
-      phoneLabel.text = phone
+      phoneLabel.styledText = phone
       dividerView.isHidden = false
-      phoneContainerView.isHidden = false
+      phoneStackView.isHidden = false
     } else {
+      phoneLabel.styledText = nil
       dividerView.isHidden = true
-      phoneContainerView.isHidden = true
+      phoneStackView.isHidden = true
     }
   }
 
