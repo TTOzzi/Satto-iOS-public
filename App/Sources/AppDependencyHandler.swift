@@ -31,6 +31,7 @@ struct AppDependencyHandler: DependencyRegistrable {
     }
   }
 
+  @MainActor
   private func configureTabBarController() {
     // TODO: 이미 TabBarController 가 있는 경우에 대한 예외 처리
     let tabBarController = BaseTabBarController()

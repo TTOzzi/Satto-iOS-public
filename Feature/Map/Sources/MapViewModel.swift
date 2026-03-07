@@ -30,6 +30,7 @@ public enum CameraMoveReason {
   case moveToCurrentLocation
 }
 
+@MainActor
 public final class MapViewModel {
 
   enum Input {
@@ -69,6 +70,7 @@ public final class MapViewModel {
   private var poiDetailFetchTask: Task<Void, Never>?
   private var isTabEntryAuthorizationCheckPending = false
   private var hasShownDeniedAlert = false
+  private var loadingCount = 0
 
   public init() {
     setupLocationBinding()
@@ -107,17 +109,22 @@ public final class MapViewModel {
   private func setupLocationBinding() {
     locationService.authorizationStatus
       .sink { [weak self] status in
-        self?.output.locationAuthorizationStatus.send(status)
-        self?.handleAuthorizationStatus(status)
+        Task { @MainActor in
+          guard let self else { return }
+          self.output.locationAuthorizationStatus.send(status)
+          self.handleAuthorizationStatus(status)
+        }
       }
       .store(in: &cancellables)
 
     locationService.currentLocation
       .sink { [weak self] location in
-        self?.output.currentLocation.send(location)
-
-        if location != nil {
-          self?.locationService.stopUpdatingLocation()
+        Task { @MainActor in
+          guard let self else { return }
+          self.output.currentLocation.send(location)
+          if location != nil {
+            self.locationService.stopUpdatingLocation()
+          }
         }
       }
       .store(in: &cancellables)
@@ -206,22 +213,21 @@ public final class MapViewModel {
     selectedPOIUniqueId = nil
     output.selectedPOI.send(nil)
     output.poiDetail.send(nil)
-    output.isLoading.send(false)
   }
 
   private func fetchPOIDetail(poi: MapPOI) {
     poiDetailFetchTask?.cancel()
-    output.isLoading.send(true)
-    poiDetailFetchTask = Task { [weak self] in
+    beginLoading()
+    poiDetailFetchTask = Task { @MainActor [weak self] in
       guard let self else { return }
+      defer { self.endLoading() }
+
       do {
         let detail = try await mapService.fetchPOIDetail(poi: poi)
         guard !Task.isCancelled else { return }
         output.poiDetail.send(detail)
-        output.isLoading.send(false)
       } catch {
         guard !Task.isCancelled else { return }
-        output.isLoading.send(false)
         output.showError.send { [weak self] in
           self?.fetchPOIDetail(poi: poi)
         }
@@ -231,9 +237,11 @@ public final class MapViewModel {
 
   private func fetchPOIs(bounds: MapBounds) {
     poiFetchTask?.cancel()
-    output.isLoading.send(true)
-    poiFetchTask = Task { [weak self] in
+    beginLoading()
+    poiFetchTask = Task { @MainActor [weak self] in
       guard let self else { return }
+      defer { self.endLoading() }
+
       do {
         let result = try await mapService.fetchPOIs(
           minLat: bounds.minLat,
@@ -245,15 +253,29 @@ public final class MapViewModel {
         guard !Task.isCancelled else { return }
         output.lottoStores.send(result.lottoStores)
         output.atmStores.send(result.atms)
-        output.isLoading.send(false)
       } catch {
         guard !Task.isCancelled else { return }
-        output.isLoading.send(false)
         output.showError.send { [weak self] in
           guard let self, let bounds = self.currentBounds else { return }
           self.fetchPOIs(bounds: bounds)
         }
       }
+    }
+  }
+
+  private func beginLoading() {
+    loadingCount += 1
+    if loadingCount == 1 {
+      output.isLoading.send(true)
+    }
+  }
+
+  private func endLoading() {
+    if loadingCount > 0 {
+      loadingCount -= 1
+    }
+    if loadingCount == 0 {
+      output.isLoading.send(false)
     }
   }
 }
