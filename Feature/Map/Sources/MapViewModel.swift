@@ -65,9 +65,16 @@ public final class MapViewModel {
   private var hasInitiallyLoaded = false
   private var selectedPOIUniqueId: String?
   private var currentFilter: MapPOIFilter = .all
+  private var poiFetchTask: Task<Void, Never>?
+  private var poiDetailFetchTask: Task<Void, Never>?
 
   public init() {
     setupLocationBinding()
+  }
+
+  deinit {
+    poiFetchTask?.cancel()
+    poiDetailFetchTask?.cancel()
   }
 
   func send(input: Input) {
@@ -186,19 +193,25 @@ public final class MapViewModel {
   }
 
   private func handleCloseStoreDetail() {
+    poiDetailFetchTask?.cancel()
     selectedPOIUniqueId = nil
     output.selectedPOI.send(nil)
     output.poiDetail.send(nil)
+    output.isLoading.send(false)
   }
 
   private func fetchPOIDetail(poi: MapPOI) {
+    poiDetailFetchTask?.cancel()
     output.isLoading.send(true)
-    Task {
+    poiDetailFetchTask = Task { [weak self] in
+      guard let self else { return }
       do {
         let detail = try await mapService.fetchPOIDetail(poi: poi)
+        guard !Task.isCancelled else { return }
         output.poiDetail.send(detail)
         output.isLoading.send(false)
       } catch {
+        guard !Task.isCancelled else { return }
         output.isLoading.send(false)
         output.showError.send { [weak self] in
           self?.fetchPOIDetail(poi: poi)
@@ -208,8 +221,10 @@ public final class MapViewModel {
   }
 
   private func fetchPOIs(bounds: MapBounds) {
+    poiFetchTask?.cancel()
     output.isLoading.send(true)
-    Task {
+    poiFetchTask = Task { [weak self] in
+      guard let self else { return }
       do {
         let result = try await mapService.fetchPOIs(
           minLat: bounds.minLat,
@@ -218,10 +233,12 @@ public final class MapViewModel {
           maxLng: bounds.maxLng,
           filter: currentFilter
         )
+        guard !Task.isCancelled else { return }
         output.lottoStores.send(result.lottoStores)
         output.atmStores.send(result.atms)
         output.isLoading.send(false)
       } catch {
+        guard !Task.isCancelled else { return }
         output.isLoading.send(false)
         output.showError.send { [weak self] in
           guard let self, let bounds = self.currentBounds else { return }
