@@ -25,12 +25,12 @@ final class MapFilterChipButton: UIControl {
       }
     }
 
-    var iconName: String {
+    var iconImage: UIImage {
       switch self {
       case .lottoStore:
-        return "storefront.fill"
+        return STImages.store.image
       case .atm:
-        return "banknote.fill"
+        return STImages.atm.image
       }
     }
 
@@ -67,7 +67,6 @@ final class MapFilterChipButton: UIControl {
   }
   private let iconImageView = UIImageView().then {
     $0.contentMode = .scaleAspectFit
-    $0.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)
   }
   private let titleLabel = UILabel().then {
     $0.style = Typography.Body_14_SB
@@ -102,7 +101,7 @@ final class MapFilterChipButton: UIControl {
     iconImageView.snp.makeConstraints {
       $0.width.height.equalTo(16)
     }
-    iconImageView.image = UIImage(systemName: kind.iconName)
+    iconImageView.image = kind.iconImage
 
     titleLabel.styledText = kind.title
 

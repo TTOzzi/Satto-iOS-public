@@ -98,6 +98,7 @@ public final class MapViewController: BaseViewController {
 
   public override func viewDidLoad() {
     super.viewDidLoad()
+    setNavigationBarHidden(true)
     setupUI()
     updateMyLocationButtonAppearance(for: mapView.positionMode)
     setupBinding()
@@ -110,18 +111,17 @@ public final class MapViewController: BaseViewController {
   }
 
   private func setupUI() {
-    title = "명소"
     view.backgroundColor = STColors.white.color
 
     view.addSubview(naverMapView)
     naverMapView.snp.makeConstraints {
-      $0.top.leading.trailing.equalTo(view.safeAreaLayoutGuide)
+      $0.top.leading.trailing.equalToSuperview()
       $0.bottom.equalTo(view)
     }
 
     view.addSubview(filterStackView)
     filterStackView.snp.makeConstraints {
-      $0.centerX.equalToSuperview()
+      $0.leading.equalTo(view.safeAreaLayoutGuide).inset(16)
       $0.top.equalTo(view.safeAreaLayoutGuide).offset(16)
     }
     filterStackView.addArrangedSubview(lottoFilterButton)
