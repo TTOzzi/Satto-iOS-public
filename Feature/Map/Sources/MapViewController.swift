@@ -42,13 +42,16 @@ public final class MapViewController: BaseViewController {
   private lazy var atmFilterButton = MapFilterChipButton(kind: .atm).then {
     $0.addTarget(self, action: #selector(didTapATMFilterButton), for: .touchUpInside)
   }
-  private var lottoMarkers: [String: LottoMarker] = [:]
-  private var atmMarkers: [String: ATMMarker] = [:]
-  private var lottoMarkerNames: [String: String] = [:]
-  private var atmMarkerNames: [String: String] = [:]
   private var selectedPOI: MapPOI?
   private var selectedFilter: MapPOIFilter = .all
   private var nextCameraMoveReason: CameraMoveReason = .initial
+  private lazy var markerRenderer = MapMarkerRenderer(
+    mapView: mapView,
+    markerLabelHideThreshold: Constant.markerLabelHideThreshold
+  ) { [weak self] poi in
+    self?.viewModel.send(input: .poiTapped(poi: poi))
+  }
+  private let bottomSheetAnimator = BottomSheetAnimator()
   private lazy var searchButton = UIButton(type: .system).then {
     $0.setTitle("현 지도에서 검색", for: .normal)
     $0.setTitleColor(STColors.primary1.color, for: .normal)
@@ -169,14 +172,16 @@ public final class MapViewController: BaseViewController {
     viewModel.output.lottoStores
       .receive(on: DispatchQueue.main)
       .sink { [weak self] stores in
-        self?.updateLottoMarkers(stores: stores)
+        guard let self else { return }
+        markerRenderer.updateLottoMarkers(stores: stores, selectedPOIUniqueId: selectedPOI?.uniqueId)
       }
       .store(in: &cancellables)
 
     viewModel.output.atmStores
       .receive(on: DispatchQueue.main)
       .sink { [weak self] stores in
-        self?.updateATMMarkers(stores: stores)
+        guard let self else { return }
+        markerRenderer.updateATMMarkers(stores: stores, selectedPOIUniqueId: selectedPOI?.uniqueId)
       }
       .store(in: &cancellables)
 
@@ -362,93 +367,9 @@ public final class MapViewController: BaseViewController {
     }
   }
 
-  private func updateLottoMarkers(stores: [MapPOI]) {
-    let newStoreIds = Set(stores.map { $0.id })
-    let existingIds = Set(lottoMarkers.keys)
-
-    // 삭제된 마커 제거
-    let removedIds = existingIds.subtracting(newStoreIds)
-    for id in removedIds {
-      lottoMarkers[id]?.mapView = nil
-      lottoMarkers.removeValue(forKey: id)
-      lottoMarkerNames.removeValue(forKey: id)
-    }
-
-    // 새로운 마커 추가
-    for store in stores {
-      lottoMarkerNames[store.id] = store.name
-      if lottoMarkers[store.id] == nil {
-        let marker = LottoMarker()
-        marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
-        marker.captionText = store.name
-        marker.touchHandler = { [weak self] _ in
-          self?.viewModel.send(input: .poiTapped(poi: store))
-          return true
-        }
-        marker.isSelected = selectedPOI?.uniqueId == store.uniqueId
-        marker.mapView = mapView
-        lottoMarkers[store.id] = marker
-      }
-    }
-
-    updateMarkerCaptionVisibility()
-  }
-
-  private func updateATMMarkers(stores: [MapPOI]) {
-    let newStoreIds = Set(stores.map { $0.id })
-    let existingIds = Set(atmMarkers.keys)
-
-    // 삭제된 마커 제거
-    let removedIds = existingIds.subtracting(newStoreIds)
-    for id in removedIds {
-      atmMarkers[id]?.mapView = nil
-      atmMarkers.removeValue(forKey: id)
-      atmMarkerNames.removeValue(forKey: id)
-    }
-
-    // 새로운 마커 추가
-    for store in stores {
-      atmMarkerNames[store.id] = store.name
-      if atmMarkers[store.id] == nil {
-        let marker = ATMMarker()
-        marker.position = NMGLatLng(lat: store.latitude, lng: store.longitude)
-        marker.captionText = store.name
-        marker.touchHandler = { [weak self] _ in
-          self?.viewModel.send(input: .poiTapped(poi: store))
-          return true
-        }
-        marker.isSelected = selectedPOI?.uniqueId == store.uniqueId
-        marker.mapView = mapView
-        atmMarkers[store.id] = marker
-      }
-    }
-
-    updateMarkerCaptionVisibility()
-  }
-
   private func handlePOISelected(poi: MapPOI?) {
-    // 이전 선택 해제
-    if let previousPOI = selectedPOI {
-      switch previousPOI.type {
-      case .lottoStore:
-        lottoMarkers[previousPOI.id]?.isSelected = false
-      case .atm:
-        atmMarkers[previousPOI.id]?.isSelected = false
-      }
-    }
-
-    // 새로운 선택
-    if let poi {
-      switch poi.type {
-      case .lottoStore:
-        lottoMarkers[poi.id]?.isSelected = true
-      case .atm:
-        atmMarkers[poi.id]?.isSelected = true
-      }
-      selectedPOI = poi
-    } else {
-      selectedPOI = nil
-    }
+    markerRenderer.updateSelection(from: selectedPOI, to: poi)
+    selectedPOI = poi
   }
 
   private func handlePOIDetailUpdate(detail: MapPOIDetail?) {
@@ -466,34 +387,17 @@ public final class MapViewController: BaseViewController {
     atmFilterButton.isChipSelected = filter == .atm
   }
 
-  private func updateMarkerCaptionVisibility() {
-    let totalMarkerCount = lottoMarkers.count + atmMarkers.count
-    let shouldHideCaption = totalMarkerCount > Constant.markerLabelHideThreshold
-
-    for (id, marker) in lottoMarkers {
-      marker.captionText = shouldHideCaption ? "" : (lottoMarkerNames[id] ?? "")
-    }
-
-    for (id, marker) in atmMarkers {
-      marker.captionText = shouldHideCaption ? "" : (atmMarkerNames[id] ?? "")
-    }
-  }
-
   private func showStoreDetailBottomSheet() {
-    storeDetailBottomSheet.isHidden = false
-    storeDetailBottomSheet.transform = CGAffineTransform(translationX: 0, y: 200)
-
     myLocationButton.snp.remakeConstraints {
       $0.width.height.equalTo(48)
       $0.trailing.equalTo(view.safeAreaLayoutGuide).inset(16)
       $0.bottom.equalTo(storeDetailBottomSheet.snp.top).offset(-12)
     }
 
-    UIView.animate(withDuration: 0.25) {
-      self.storeDetailBottomSheet.alpha = 1
-      self.storeDetailBottomSheet.transform = .identity
-      self.view.layoutIfNeeded()
-    }
+    bottomSheetAnimator.show(
+      sheetView: storeDetailBottomSheet,
+      in: view
+    )
 
     if let tabBarController = tabBarController as? BaseTabBarController {
       tabBarController.customTabBar.isHidden = true
@@ -511,13 +415,10 @@ public final class MapViewController: BaseViewController {
       $0.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
     }
 
-    UIView.animate(withDuration: 0.25) {
-      self.storeDetailBottomSheet.alpha = 0
-      self.storeDetailBottomSheet.transform = CGAffineTransform(translationX: 0, y: 200)
-      self.view.layoutIfNeeded()
-    } completion: { _ in
-      self.storeDetailBottomSheet.isHidden = true
-    }
+    bottomSheetAnimator.hide(
+      sheetView: storeDetailBottomSheet,
+      in: view
+    )
   }
 }
 
@@ -532,5 +433,6 @@ extension MapViewController: NMFMapViewCameraDelegate {
 
 @available(iOS 17.0, *)
 #Preview {
+  @MainActor in
   MapViewController(viewModel: MapViewModel())
 }
