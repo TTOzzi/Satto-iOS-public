@@ -77,7 +77,7 @@ final class MapService {
       maxLng: maxLng
     )
     let response = try await networkProvider.request(target: target)
-    return response.markers.map { $0.toDomain(type: .lottoStore) }
+    return response.markers.compactMap { $0.toDomain(type: .lottoStore) }
   }
 
   private func fetchATMs(
@@ -93,7 +93,7 @@ final class MapService {
       maxLng: maxLng
     )
     let response = try await networkProvider.request(target: target)
-    return response.markers.map { $0.toDomain(type: .atm) }
+    return response.markers.compactMap { $0.toDomain(type: .atm) }
   }
 
   private func fetchLottoStoreDetail(storeId: String) async throws -> MapPOIDetail {

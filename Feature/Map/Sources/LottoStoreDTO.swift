@@ -19,12 +19,16 @@ struct MapMarkerDTO: Decodable {
 }
 
 extension MapMarkerDTO {
-  func toDomain(type: MapPOIType) -> MapPOI {
-    MapPOI(
+  func toDomain(type: MapPOIType) -> MapPOI? {
+    guard let latitude = Double(latitude), let longitude = Double(longitude) else {
+      return nil
+    }
+
+    return MapPOI(
       id: id,
       name: name,
-      latitude: Double(latitude) ?? 0,
-      longitude: Double(longitude) ?? 0,
+      latitude: latitude,
+      longitude: longitude,
       type: type
     )
   }
