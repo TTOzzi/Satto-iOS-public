@@ -15,8 +15,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) -> Bool {
     setupDependencyInjector()
     setupDependencyHandler()
-    NMFAuthManager.shared().ncpKeyId = "o6fmsibs9l" // 재발급하기
+    configureNaverMapAuth()
     return true
+  }
+
+  private func configureNaverMapAuth() {
+    guard
+      let keyId = Bundle.main.object(forInfoDictionaryKey: "NAVER_MAP_CLIENT_ID") as? String,
+      !keyId.isEmpty
+    else {
+      assertionFailure("NAVER_MAP_CLIENT_ID is missing. Set it in App/Configs/*.xcconfig.local")
+      return
+    }
+
+    NMFAuthManager.shared().ncpKeyId = keyId
   }
 
   // MARK: UISceneSession Lifecycle

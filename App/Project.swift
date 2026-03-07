@@ -19,6 +19,7 @@ struct AppLayer: Layer {
             "CFBundleShortVersionString": "$(MARKETING_VERSION)",
             "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
             "ITSAppUsesNonExemptEncryption": false,
+            "NAVER_MAP_CLIENT_ID": "$(NAVER_MAP_CLIENT_ID)",
             "NSLocationWhenInUseUsageDescription": "위치 정보를 기반으로 현재 위치, 주변 검색, 길찾기 정보, 컨텐츠 추천 및 광고를 제공합니다",
             "UILaunchStoryboardName": "LaunchScreen",
             "UIUserInterfaceStyle": "Light",
@@ -55,7 +56,8 @@ struct AppLayer: Layer {
                 "APP_IDENTIFIER": "com.hanbang.satto.debug",
                 "APP_NAME": "사또 Debug",
                 "OTHER_SWIFT_FLAGS": "$(inherited) -DDEBUG",
-              ]
+              ],
+              xcconfig: "Configs/Debug.xcconfig"
             ),
             .release(
               name: .release,
@@ -63,7 +65,8 @@ struct AppLayer: Layer {
                 "APP_IDENTIFIER": "com.hanbang.satto",
                 "APP_NAME": "사또",
                 "OTHER_SWIFT_FLAGS": "$(inherited) -DRELEASE",
-              ]
+              ],
+              xcconfig: "Configs/Release.xcconfig"
             ),
           ]
         )
