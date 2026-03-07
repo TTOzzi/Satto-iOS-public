@@ -178,8 +178,10 @@ public final class MapViewModel {
       }
 
     case .moveToCurrentLocation:
-      // 현재 위치로 이동 시 무시
-      break
+      // 위치 권한 허용 후 현재 위치로 포커싱된 경우 자동 재검색
+      output.shouldShowSearchButton.send(false)
+      fetchPOIs(bounds: bounds)
+      hasInitiallyLoaded = true
     }
   }
 
