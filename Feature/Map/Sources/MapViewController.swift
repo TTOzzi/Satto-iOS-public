@@ -76,6 +76,7 @@ public final class MapViewController: BaseViewController {
     $0.contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
     $0.addTarget(self, action: #selector(didTapMyLocation), for: .touchUpInside)
     $0.accessibilityLabel = "현재 위치로 이동"
+    $0.isHidden = true
   }
   private lazy var storeDetailBottomSheet = StoreDetailBottomSheetView().then {
     $0.isHidden = true
@@ -239,12 +240,16 @@ public final class MapViewController: BaseViewController {
   }
 
   private func handleAuthorizationStatus(_ status: CLAuthorizationStatus) {
+    let isAuthorized = status == .authorizedWhenInUse || status == .authorizedAlways
+    myLocationButton.isHidden = !isAuthorized
+
     switch status {
     case .authorizedWhenInUse, .authorizedAlways:
       mapView.positionMode = .direction
       updateMyLocationButtonAppearance(for: mapView.positionMode)
     default:
-      break
+      mapView.positionMode = .disabled
+      updateMyLocationButtonAppearance(for: mapView.positionMode)
     }
   }
 

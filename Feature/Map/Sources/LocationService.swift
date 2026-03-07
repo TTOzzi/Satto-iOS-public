@@ -46,13 +46,13 @@ final class LocationService: NSObject {
   
   func requestAuthorization() {
     let status = locationManager.authorizationStatus
+    authorizationStatusSubject.send(status)
     
     switch status {
     case .notDetermined:
       locationManager.requestWhenInUseAuthorization()
     case .denied, .restricted:
-      // Re-emit denied/restricted status so UI can react when map tab is revisited.
-      authorizationStatusSubject.send(status)
+      break
     case .authorizedWhenInUse, .authorizedAlways:
       startUpdatingLocation()
     @unknown default:
