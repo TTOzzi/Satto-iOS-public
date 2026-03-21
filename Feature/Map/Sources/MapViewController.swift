@@ -42,8 +42,6 @@ public final class MapViewController: BaseViewController {
   private lazy var atmFilterButton = MapFilterChipButton(kind: .atm).then {
     $0.addTarget(self, action: #selector(didTapATMFilterButton), for: .touchUpInside)
   }
-  private var selectedPOI: MapPOI?
-  private var selectedFilter: MapPOIFilter = .all
   private var nextCameraMoveReason: CameraMoveReason = .initial
   private lazy var markerRenderer = MapMarkerRenderer(
     mapView: mapView,
@@ -173,7 +171,10 @@ public final class MapViewController: BaseViewController {
       .receive(on: DispatchQueue.main)
       .sink { [weak self] stores in
         guard let self else { return }
-        markerRenderer.updateLottoMarkers(stores: stores, selectedPOIUniqueId: selectedPOI?.uniqueId)
+        markerRenderer.updateLottoMarkers(
+          stores: stores,
+          selectedPOIUniqueId: viewModel.output.selectedPOI.value?.uniqueId
+        )
       }
       .store(in: &cancellables)
 
@@ -181,7 +182,10 @@ public final class MapViewController: BaseViewController {
       .receive(on: DispatchQueue.main)
       .sink { [weak self] stores in
         guard let self else { return }
-        markerRenderer.updateATMMarkers(stores: stores, selectedPOIUniqueId: selectedPOI?.uniqueId)
+        markerRenderer.updateATMMarkers(
+          stores: stores,
+          selectedPOIUniqueId: viewModel.output.selectedPOI.value?.uniqueId
+        )
       }
       .store(in: &cancellables)
 
@@ -217,8 +221,11 @@ public final class MapViewController: BaseViewController {
 
     viewModel.output.selectedPOI
       .receive(on: DispatchQueue.main)
-      .sink { [weak self] poi in
-        self?.handlePOISelected(poi: poi)
+      .scan((nil as MapPOI?, nil as MapPOI?)) { pair, current in
+        (pair.1, current)
+      }
+      .sink { [weak self] pair in
+        self?.handlePOISelectionChanged(previous: pair.0, current: pair.1)
       }
       .store(in: &cancellables)
 
@@ -333,13 +340,11 @@ public final class MapViewController: BaseViewController {
   }
 
   @objc private func didTapLottoFilterButton() {
-    let nextFilter: MapPOIFilter = selectedFilter == .lottoStore ? .all : .lottoStore
-    viewModel.send(input: .filterChanged(filter: nextFilter))
+    viewModel.send(input: .lottoFilterTapped)
   }
 
   @objc private func didTapATMFilterButton() {
-    let nextFilter: MapPOIFilter = selectedFilter == .atm ? .all : .atm
-    viewModel.send(input: .filterChanged(filter: nextFilter))
+    viewModel.send(input: .atmFilterTapped)
   }
 
   private func currentMapBounds() -> MapBounds {
@@ -367,9 +372,8 @@ public final class MapViewController: BaseViewController {
     }
   }
 
-  private func handlePOISelected(poi: MapPOI?) {
-    markerRenderer.updateSelection(from: selectedPOI, to: poi)
-    selectedPOI = poi
+  private func handlePOISelectionChanged(previous: MapPOI?, current: MapPOI?) {
+    markerRenderer.updateSelection(from: previous, to: current)
   }
 
   private func handlePOIDetailUpdate(detail: MapPOIDetail?) {
@@ -397,7 +401,6 @@ public final class MapViewController: BaseViewController {
   }
 
   private func applyFilterUI(filter: MapPOIFilter) {
-    selectedFilter = filter
     lottoFilterButton.isChipSelected = filter == .lottoStore
     atmFilterButton.isChipSelected = filter == .atm
   }

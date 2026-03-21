@@ -39,7 +39,8 @@ public final class MapViewModel {
     case cameraIdle(bounds: MapBounds, reason: CameraMoveReason)
     case searchButtonTapped
     case poiTapped(poi: MapPOI)
-    case filterChanged(filter: MapPOIFilter)
+    case lottoFilterTapped
+    case atmFilterTapped
     case closeStoreDetail
   }
 
@@ -51,7 +52,7 @@ public final class MapViewModel {
     let locationAuthorizationStatus = PassthroughSubject<CLAuthorizationStatus, Never>()
     let currentLocation = PassthroughSubject<CLLocation?, Never>()
     let shouldShowLocationDeniedAlert = PassthroughSubject<Void, Never>()
-    let selectedPOI = PassthroughSubject<MapPOI?, Never>()
+    let selectedPOI = CurrentValueSubject<MapPOI?, Never>(nil)
     let shouldShowSearchButton = CurrentValueSubject<Bool, Never>(false)
     let poiDetail = PassthroughSubject<MapPOIDetail?, Never>()
     let selectedFilter = CurrentValueSubject<MapPOIFilter, Never>(.all)
@@ -64,8 +65,6 @@ public final class MapViewModel {
   private var cancellables = Set<AnyCancellable>()
   private var currentBounds: MapBounds?
   private var hasInitiallyLoaded = false
-  private var selectedPOIUniqueId: String?
-  private var currentFilter: MapPOIFilter = .all
   private var poiFetchTask: Task<Void, Never>?
   private var poiDetailFetchTask: Task<Void, Never>?
   private var isTabEntryAuthorizationCheckPending = false
@@ -98,8 +97,11 @@ public final class MapViewModel {
     case .poiTapped(let poi):
       handlePOITapped(poi: poi)
 
-    case .filterChanged(let filter):
-      handleFilterChanged(filter: filter)
+    case .lottoFilterTapped:
+      handleFilterTapped(targetFilter: .lottoStore)
+
+    case .atmFilterTapped:
+      handleFilterTapped(targetFilter: .atm)
 
     case .closeStoreDetail:
       handleCloseStoreDetail()
@@ -192,16 +194,19 @@ public final class MapViewModel {
   }
 
   private func handlePOITapped(poi: MapPOI) {
-    guard selectedPOIUniqueId != poi.uniqueId else { return }
-    selectedPOIUniqueId = poi.uniqueId
+    guard output.selectedPOI.value?.uniqueId != poi.uniqueId else { return }
     output.selectedPOI.send(poi)
     fetchPOIDetail(poi: poi)
   }
 
-  private func handleFilterChanged(filter: MapPOIFilter) {
-    guard currentFilter != filter else { return }
+  private func handleFilterTapped(targetFilter: MapPOIFilter) {
+    let filter: MapPOIFilter = output.selectedFilter.value == targetFilter ? .all : targetFilter
+    applyFilter(filter)
+  }
 
-    currentFilter = filter
+  private func applyFilter(_ filter: MapPOIFilter) {
+    guard output.selectedFilter.value != filter else { return }
+
     output.selectedFilter.send(filter)
     handleCloseStoreDetail()
     output.shouldShowSearchButton.send(false)
@@ -212,7 +217,6 @@ public final class MapViewModel {
 
   private func handleCloseStoreDetail() {
     poiDetailFetchTask?.cancel()
-    selectedPOIUniqueId = nil
     output.selectedPOI.send(nil)
     output.poiDetail.send(nil)
   }
@@ -250,7 +254,7 @@ public final class MapViewModel {
           maxLat: bounds.maxLat,
           minLng: bounds.minLng,
           maxLng: bounds.maxLng,
-          filter: currentFilter
+          filter: output.selectedFilter.value
         )
         guard !Task.isCancelled else { return }
         output.lottoStores.send(result.lottoStores)
