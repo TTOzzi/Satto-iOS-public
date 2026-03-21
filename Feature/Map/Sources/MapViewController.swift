@@ -81,7 +81,7 @@ public final class MapViewController: BaseViewController {
     $0.accessibilityLabel = "현재 위치로 이동"
     $0.isHidden = true
   }
-  private lazy var storeDetailBottomSheet = StoreDetailBottomSheetView().then {
+  private lazy var storeDetailBottomSheet = CardFloatingView().then {
     $0.isHidden = true
     $0.alpha = 0
     $0.onCloseButtonTapped = { [weak self] in
@@ -374,11 +374,26 @@ public final class MapViewController: BaseViewController {
 
   private func handlePOIDetailUpdate(detail: MapPOIDetail?) {
     if let detail = detail {
-      storeDetailBottomSheet.configure(with: detail)
+      storeDetailBottomSheet.configure(
+        title: detail.name,
+        items: makeCardInfoItems(from: detail)
+      )
       showStoreDetailBottomSheet()
     } else {
       hideStoreDetailBottomSheet()
     }
+  }
+
+  private func makeCardInfoItems(from detail: MapPOIDetail) -> [CardFloatingInfoItem] {
+    var items: [CardFloatingInfoItem] = [
+      CardFloatingInfoItem(icon: STImages.navigation.image, text: detail.address)
+    ]
+
+    if let phone = detail.phone?.trimmingCharacters(in: .whitespacesAndNewlines), !phone.isEmpty {
+      items.append(CardFloatingInfoItem(icon: STImages.phone.image, text: phone))
+    }
+
+    return items
   }
 
   private func applyFilterUI(filter: MapPOIFilter) {
