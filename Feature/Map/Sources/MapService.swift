@@ -14,43 +14,20 @@ final class MapService {
   @Injected private var networkProvider: NetworkProvider
 
   func fetchPOIs(
-    minLat: Double,
-    maxLat: Double,
-    minLng: Double,
-    maxLng: Double,
+    bounds: MapBounds,
     filter: MapPOIFilter
   ) async throws -> MapPOIFetchResult {
     switch filter {
     case .all:
-      async let lottoStoresRequest = fetchLottoStores(
-        minLat: minLat,
-        maxLat: maxLat,
-        minLng: minLng,
-        maxLng: maxLng
-      )
-      async let atmsRequest = fetchATMs(
-        minLat: minLat,
-        maxLat: maxLat,
-        minLng: minLng,
-        maxLng: maxLng
-      )
+      async let lottoStoresRequest = fetchLottoStores(bounds: bounds)
+      async let atmsRequest = fetchATMs(bounds: bounds)
       let (lottoStores, atms) = try await (lottoStoresRequest, atmsRequest)
       return MapPOIFetchResult(lottoStores: lottoStores, atms: atms)
     case .lottoStore:
-      let lottoStores = try await fetchLottoStores(
-        minLat: minLat,
-        maxLat: maxLat,
-        minLng: minLng,
-        maxLng: maxLng
-      )
+      let lottoStores = try await fetchLottoStores(bounds: bounds)
       return MapPOIFetchResult(lottoStores: lottoStores, atms: [])
     case .atm:
-      let atms = try await fetchATMs(
-        minLat: minLat,
-        maxLat: maxLat,
-        minLng: minLng,
-        maxLng: maxLng
-      )
+      let atms = try await fetchATMs(bounds: bounds)
       return MapPOIFetchResult(lottoStores: [], atms: atms)
     }
   }
@@ -64,33 +41,23 @@ final class MapService {
     }
   }
 
-  private func fetchLottoStores(
-    minLat: Double,
-    maxLat: Double,
-    minLng: Double,
-    maxLng: Double
-  ) async throws -> [MapPOI] {
+  private func fetchLottoStores(bounds: MapBounds) async throws -> [MapPOI] {
     let target = MapTarget.GetLottoStores(
-      minLat: minLat,
-      maxLat: maxLat,
-      minLng: minLng,
-      maxLng: maxLng
+      minLat: bounds.minLat,
+      maxLat: bounds.maxLat,
+      minLng: bounds.minLng,
+      maxLng: bounds.maxLng
     )
     let response = try await networkProvider.request(target: target)
     return response.markers.compactMap { $0.toDomain(type: .lottoStore) }
   }
 
-  private func fetchATMs(
-    minLat: Double,
-    maxLat: Double,
-    minLng: Double,
-    maxLng: Double
-  ) async throws -> [MapPOI] {
+  private func fetchATMs(bounds: MapBounds) async throws -> [MapPOI] {
     let target = MapTarget.GetATMs(
-      minLat: minLat,
-      maxLat: maxLat,
-      minLng: minLng,
-      maxLng: maxLng
+      minLat: bounds.minLat,
+      maxLat: bounds.maxLat,
+      minLng: bounds.minLng,
+      maxLng: bounds.maxLng
     )
     let response = try await networkProvider.request(target: target)
     return response.markers.compactMap { $0.toDomain(type: .atm) }

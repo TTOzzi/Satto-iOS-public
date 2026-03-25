@@ -10,20 +10,6 @@ import CoreLocation
 import DIInjector
 import Foundation
 
-public struct MapBounds {
-  let minLat: Double
-  let maxLat: Double
-  let minLng: Double
-  let maxLng: Double
-
-  public init(minLat: Double, maxLat: Double, minLng: Double, maxLng: Double) {
-    self.minLat = minLat
-    self.maxLat = maxLat
-    self.minLng = minLng
-    self.maxLng = maxLng
-  }
-}
-
 public enum CameraMoveReason {
   case initial
   case userInteraction
@@ -250,10 +236,7 @@ public final class MapViewModel {
 
       do {
         let result = try await mapService.fetchPOIs(
-          minLat: bounds.minLat,
-          maxLat: bounds.maxLat,
-          minLng: bounds.minLng,
-          maxLng: bounds.maxLng,
+          bounds: bounds,
           filter: output.selectedFilter.value
         )
         guard !Task.isCancelled else { return }
